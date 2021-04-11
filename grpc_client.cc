@@ -8,31 +8,59 @@
 
 #include "grpc_client.h"
 
+
+
+
+
+
+
+
+class ChannelStore {
+	public:
+    static void Init() {
+      singleton_ = new ChannelStore();
+    }
+    static ChannelStore* Get() {
+      return singleton_;
+		}
+    grpc::Channel* Channel() {
+      auto ch = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
+      ptr_.swap(ch);
+      return ptr_.get();
+    }
+	private:
+    static ChannelStore* singleton_;
+    std::shared_ptr<grpc::Channel> ptr_;
+};
+
+ChannelStore* ChannelStore::singleton_= nullptr;
+
 int mainz(int argc, char** argv) {
+  ChannelStore::Init();
   std::cout << "huzzah\n";
-  ::grpc::ClientContext ctx;
-  auto ch = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
-  grpc::ByteBuffer req(NULL, 0); 
+  auto ctx = new grpc::ClientContext();
+  auto ch = ChannelStore::Get()->Channel();
+
+  auto req = new grpc::ByteBuffer(NULL, 0); 
   auto meth = grpc::internal::RpcMethod("/helloworld.Greeter/SayHello", grpc::internal::RpcMethod::NORMAL_RPC);
-  auto bb = grpc::ByteBuffer();
+  auto bb = new grpc::ByteBuffer();
   ::grpc::internal::CallbackUnaryCall<
     grpc::ByteBuffer,
     grpc::ByteBuffer,
     grpc::ByteBuffer,
-    grpc::ByteBuffer>(ch.get(), meth, &ctx, &req, &bb, [&bb](grpc::Status s) {
+    grpc::ByteBuffer>(ch, meth, ctx, req, bb, [bb](grpc::Status s) {
     std::cout << "done"
     << " " << s.error_code() 
     <<" " << s.error_message() 
     << "\n";
-  std::vector<grpc::Slice> slices;
-	bb.Dump(&slices);
-	std::string str(reinterpret_cast<const char*>(slices[0].begin()), slices[0].size());
-	std::cout << str << "\n";
+  //std::vector<grpc::Slice> slices;
+	//bb.Dump(&slices);
+	//std::string str(reinterpret_cast<const char*>(slices[0].begin()), slices[0].size());
+	//std::cout << str << "\n";
     
-exit(0);
+//exit(0);
   });
   std::cout << "woo\n";
-  while (true) {}
-  std::cout << "done\n";
+  //std::cout << "done\n";
   return 0;
 }

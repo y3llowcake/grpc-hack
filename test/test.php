@@ -2,6 +2,8 @@
 
 <<__EntryPoint>>
 function main(): void {
-	echo grpc('foo');
+	echo "hi\n";
+	print_r(Grpc\Extension\grpc_unary_call('foo'));
 	echo "fin\n";
+	sleep(5);
 }
