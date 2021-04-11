@@ -12,7 +12,7 @@ int mainz(int argc, char** argv) {
   std::cout << "huzzah\n";
   ::grpc::ClientContext ctx;
   auto ch = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
-  grpc::ByteBuffer req; 
+  grpc::ByteBuffer req(NULL, 0); 
   auto meth = grpc::internal::RpcMethod("/helloworld.Greeter/SayHello", grpc::internal::RpcMethod::NORMAL_RPC);
   auto bb = grpc::ByteBuffer();
   ::grpc::internal::CallbackUnaryCall<
@@ -30,7 +30,7 @@ int mainz(int argc, char** argv) {
 	std::cout << str << "\n";
     
 exit(0);
-  }); 
+  });
   std::cout << "woo\n";
   while (true) {}
   std::cout << "done\n";

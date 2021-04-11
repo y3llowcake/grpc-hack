@@ -7,7 +7,7 @@ HHVM_SOURCE_ROOT=/home/cy/co/hhvm
 cp ${HHVM_SOURCE_ROOT}/hphp/tools/hphpize/hphpize.cmake CMakeLists.txt
 
 # bazel test //...
-bazel build :grpc_client_lib
+bazel build :grpc_client_static
 
 #
 # https://hacklang.slack.com/archives/CAAGK9GKW/p1525741700000075
@@ -15,7 +15,7 @@ bazel build :grpc_client_lib
 # files in the hhvm source dir. They are currently missing from
 # /usr/local/include, but that should get fixed at some point...
 #
-cmake -D HHVM_DSO_TEST_MODE=1 -D GRPC_CLIENT_LIB=`realpath ./bazel-bin/libgrpc_client_lib.a` .
+cmake -D HHVM_DSO_TEST_MODE=1 -D GRPC_CLIENT_LIB=`realpath ./bazel-bin/grpc_client_static.a` .
 
 make
 PATH="${HHVM_SOURCE_ROOT}/hphp/hhvm/:$PATH" ./test/test.sh
