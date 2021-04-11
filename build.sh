@@ -1,8 +1,10 @@
 #!/bin/bash
 set -xeuo pipefail
 
+HHVM_SOURCE_ROOT=/home/cy/co/hhvm
+
 # hacky version of hphpize
-cp /home/cy/co/hhvm/hphp/tools/hphpize/hphpize.cmake CMakeLists.txt
+cp ${HHVM_SOURCE_ROOT}/hphp/tools/hphpize/hphpize.cmake CMakeLists.txt
 
 # bazel test //...
 bazel build :grpc_client_lib
@@ -16,4 +18,4 @@ bazel build :grpc_client_lib
 cmake -D HHVM_DSO_TEST_MODE=1 -D GRPC_CLIENT_LIB=`realpath ./bazel-bin/libgrpc_client_lib.a` .
 
 make
-#PATH="/home/cy/co/hhvm/hphp/hhvm/:$PATH" ./test/test.sh
+PATH="${HHVM_SOURCE_ROOT}/hphp/hhvm/:$PATH" ./test/test.sh
