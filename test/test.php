@@ -2,8 +2,10 @@
 
 <<__EntryPoint>>
 function main(): void {
-	echo "hi\n";
-	print_r(HH\Asio\join(grpc_unary_call('foo'))->StatusCode());
-	echo "fin\n";
+	echo "test start\n";
+	$r = HH\Asio\join(grpc_unary_call('foo'));
+	echo "code: {$r->StatusCode()}\n";
+	echo "message: {$r->StatusMessage()}\n";
+	echo "test fin\n";
 	sleep(2);
 }

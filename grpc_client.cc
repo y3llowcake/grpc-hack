@@ -1,6 +1,3 @@
-#include <iostream>
-#include <string>
-
 #include <grpc++/grpc++.h>
 
 #include <grpcpp/impl/codegen/client_callback.h>
@@ -28,11 +25,17 @@ class ChannelStore {
 
 ChannelStore* ChannelStore::singleton_= nullptr;
 
-void GrpcClientUnaryCall(GrpcClientUnaryResultEvent* ev) {
-  ChannelStore::Init();
-  std::cout << "huzzah\n";
-  auto ctx = new grpc::ClientContext();
+// TODO: for sreq, what happens if the request is terminated before we start
+// copying the contents onto the wire? Do I need to copy early?
+void GrpcClientUnaryCall(const std::string& sreq, GrpcClientUnaryResultEvent* ev) {
+  ChannelStore::Init(); // TODO move.
   auto ch = ChannelStore::Get()->Channel();
+
+  auto slice = new grpc::Slice(sreq); // This is a copy.
+  //auto slice - 
+  auto reqbb = std::make_shared<grpc::ByteBuffer>(slice, 1);
+  auto ctx = new grpc::ClientContext();
+
 
   auto req = new grpc::ByteBuffer(NULL, 0); 
   auto meth = grpc::internal::RpcMethod("/helloworld.Greeter/SayHello", grpc::internal::RpcMethod::NORMAL_RPC);
@@ -42,18 +45,11 @@ void GrpcClientUnaryCall(GrpcClientUnaryResultEvent* ev) {
     grpc::ByteBuffer,
     grpc::ByteBuffer,
     grpc::ByteBuffer>(ch, meth, ctx, req, bb, [ev, bb](grpc::Status s) {
-    std::cout << "done"
-    << " " << s.error_code() 
-    <<" " << s.error_message() 
-    << "\n";
-    ev->done(s.error_code());
+    ev->status(s.error_code(), s.error_message(), s.error_details());
+    ev->done();
   //std::vector<grpc::Slice> slices;
 	//bb.Dump(&slices);
 	//std::string str(reinterpret_cast<const char*>(slices[0].begin()), slices[0].size());
-	//std::cout << str << "\n";
-    
-//exit(0);
+	//std::cout << str << "\n";  
   });
-  std::cout << "woo\n";
-  //std::cout << "done\n";
 }

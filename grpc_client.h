@@ -2,9 +2,10 @@
 #define GRPC_CLIENT_H__
 
 struct GrpcClientUnaryResultEvent {
-  virtual void done(int) = 0;
+  virtual void status(int code, const std::string& message, const std::string& details) = 0;
+  virtual void done() = 0;
 };
 
-void GrpcClientUnaryCall(GrpcClientUnaryResultEvent*);
+void GrpcClientUnaryCall(const std::string&, GrpcClientUnaryResultEvent*);
 
 #endif // GRPC_CLIENT_H__

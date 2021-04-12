@@ -22,6 +22,15 @@ final class GrpcUnaryCallResult {
 
 	<<__HipHopSpecific, __Native>>
 	public function StatusCode(): int;
+
+	<<__HipHopSpecific, __Native>>
+	public function StatusMessage(): string;
+
+	<<__HipHopSpecific, __Native>>
+	public function StatusDetails(): string;
+
+	<<__HipHopSpecific, __Native>>
+	public function Response(): string;
 }
 
 <<__HipHopSpecific, __Native>>
