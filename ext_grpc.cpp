@@ -75,6 +75,13 @@ struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
     markAsFinished();
   }
 
+  void fillRequest(const void** c, size_t* l) const {
+    *c = req_.data();
+    *l = req_.size();
+  }
+
+  // TODO abandon -> ctx->TryCancel();
+
   void status(int status_code, const std::string& status_message, const std::string& status_details) override {
     data_->status_code_ = status_code;
     data_->status_message_ = status_message;
@@ -94,8 +101,7 @@ struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
 
 Object HHVM_FUNCTION(grpc_unary_call, const String& req) {
   auto event = new GrpcEvent(req);
-  String s = req;
-  GrpcClientUnaryCall(req.toCppString(), event);
+  GrpcClientUnaryCall(event);
   return Object{event->getWaitHandle()};
 }
 
