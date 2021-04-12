@@ -8,13 +8,6 @@
 
 #include "grpc_client.h"
 
-
-
-
-
-
-
-
 class ChannelStore {
 	public:
     static void Init() {
@@ -35,7 +28,7 @@ class ChannelStore {
 
 ChannelStore* ChannelStore::singleton_= nullptr;
 
-int mainz(int argc, char** argv) {
+void GrpcClientUnaryCall(GrpcClientUnaryResultEvent* ev) {
   ChannelStore::Init();
   std::cout << "huzzah\n";
   auto ctx = new grpc::ClientContext();
@@ -48,11 +41,12 @@ int mainz(int argc, char** argv) {
     grpc::ByteBuffer,
     grpc::ByteBuffer,
     grpc::ByteBuffer,
-    grpc::ByteBuffer>(ch, meth, ctx, req, bb, [bb](grpc::Status s) {
+    grpc::ByteBuffer>(ch, meth, ctx, req, bb, [ev, bb](grpc::Status s) {
     std::cout << "done"
     << " " << s.error_code() 
     <<" " << s.error_message() 
     << "\n";
+    ev->done(s.error_code());
   //std::vector<grpc::Slice> slices;
 	//bb.Dump(&slices);
 	//std::string str(reinterpret_cast<const char*>(slices[0].begin()), slices[0].size());
@@ -62,5 +56,4 @@ int mainz(int argc, char** argv) {
   });
   std::cout << "woo\n";
   //std::cout << "done\n";
-  return 0;
 }

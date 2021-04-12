@@ -10,6 +10,9 @@
 
 namespace HPHP {
 
+struct UnaryCallResultData {
+  int status_code_;
+};
 
 struct GrpcUnaryCallResult {
 	static Class* s_class;
@@ -23,35 +26,33 @@ struct GrpcUnaryCallResult {
 	}
 
   GrpcUnaryCallResult(){};
-	static Object newInstance() {
+	static Object newInstance(std::unique_ptr<UnaryCallResultData> data) {
 		Object obj{getClass()};
-		//auto* data = Native::data<AsyncMysqlClientStats>(obj);
-		//data->setPerfValues(std::move(values));
+		auto* d = Native::data<GrpcUnaryCallResult>(obj);
+		d->data_ = std::move(data);
 		return obj;
 	}
+
+  std::unique_ptr<UnaryCallResultData> data_;
 
   GrpcUnaryCallResult(const GrpcUnaryCallResult&) = delete;
   GrpcUnaryCallResult& operator=(const GrpcUnaryCallResult&) = delete;
 };
 
-static int HHVM_METHOD(GrpcUnaryCallResult, StatusCode) {
-  //auto* data = Native::data<GrpcUnaryCallResult>(this_);
-	//return data->m_code;
-  return 1337;
-}
-
 Class* GrpcUnaryCallResult::s_class = nullptr;
 const StaticString GrpcUnaryCallResult::s_className("GrpcUnaryCallResult");
 
-//IMPLEMENT_GET_CLASS(GrpcUnaryCallResult)
 
-/*const StaticString
-  s_code("code"),
-  s_status("status");*/
+static int HHVM_METHOD(GrpcUnaryCallResult, StatusCode) {
+  auto* d = Native::data<GrpcUnaryCallResult>(this_);
+	return d->data_->status_code_;
+}
 
-struct GrpcEvent final : AsioExternalThreadEvent {
+struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
   public:
-  void done() {
+  void done(int status_code) {
+    data_ = std::make_unique<UnaryCallResultData>(); // todo constructor
+    data_->status_code_ = status_code;
     markAsFinished();
   }
   protected:
@@ -59,27 +60,17 @@ struct GrpcEvent final : AsioExternalThreadEvent {
   // where we return data to PHP.
   void unserialize(TypedValue& result) final {
    std::cout << "wow.\n";
-/*   auto ret = make_darray(
-      s_status, make_darray(
-        s_code, -1
-      )
-    );
-    tvCopy(make_tv<KindOfString>(StringData::Make("foo")), result);
-    //tvCopy(make_tv<KindOfDArray>(ret), result);
-    //tvCopy(make_array_like_tv(ret.get()), result); // TODO: I have no idea if this is correct from a ref/unref perspective.*/
-   auto res = GrpcUnaryCallResult::newInstance();
+   auto res = GrpcUnaryCallResult::newInstance(std::move(data_));
    tvCopy(make_tv<KindOfObject>(res.detach()), result);
    std::cout << "bong bong.\n";
-
   }
+  std::unique_ptr<UnaryCallResultData> data_;
 };
 
 Object HHVM_FUNCTION(grpc_unary_call, const String& data) {
-  mainz(0, NULL);
   auto event = new GrpcEvent();
-  event->done();
+  GrpcClientUnaryCall(event);
   return Object{event->getWaitHandle()};
-	// return ret;
 }
 
 struct GrpcExtension : Extension {
