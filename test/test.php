@@ -3,7 +3,7 @@
 <<__EntryPoint>>
 function main(): void {
 	echo "hi\n";
-	print_r(Grpc\Extension\grpc_unary_call('foo'));
+	print_r(HH\Asio\join(grpc_unary_call('foo'))->StatusCode());
 	echo "fin\n";
-	sleep(5);
+	sleep(2);
 }
