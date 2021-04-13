@@ -62,7 +62,7 @@ static String HHVM_METHOD(GrpcUnaryCallResult, StatusDetails) {
 
 static String HHVM_METHOD(GrpcUnaryCallResult, Response) {
   auto* d = Native::data<GrpcUnaryCallResult>(this_);
-	return d->data_->resp_;
+	return String(d->data_->resp_);
 }
 
 struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
@@ -71,31 +71,70 @@ struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
     data_(std::make_unique<UnaryCallResultData>()),
     req_(req) {}
 
-  void done() override {
+  void Done() override {
     markAsFinished();
   }
 
-  void fillRequest(const void** c, size_t* l) const {
+  void FillRequest(const void** c, size_t* l) const override {
     *c = req_.data();
     *l = req_.size();
   }
 
-  // TODO abandon -> ctx->TryCancel();
+  void Response(std::unique_ptr<Deserializer> d) override {
+    deser_ = std::move(d);
+  }
+/*  void ResponseAlloc(size_t l) override {
 
-  void status(int status_code, const std::string& status_message, const std::string& status_details) override {
+    std::cout << "wutang " << l << "\n";
+    //data_->resp_.reset(StringData::Make(l));
+    data_->resp_.reserve(l);
+    //data_->resp_ = StringData::Make(l);
+    std::cout << "forever\n";
+  }
+
+  void ResponseAppend(const char* c, size_t l) override {
+
+    std::cout <<"never say\n";
+    data_->resp_.get()->append(folly::StringPiece(c, l));
+    //data_->resp_->append(folly::StringPiece(c, l));
+    std::cout <<"never\n";
+  }*/
+
+  void Status(int status_code, const std::string& status_message, const std::string& status_details) override {
     data_->status_code_ = status_code;
     data_->status_message_ = status_message;
     data_->status_details_ = status_details;
   }
 
  protected:
+  // TODO abandon() -> ctx->TryCancel();
+
   // Invoked by the ASIO Framework after we have markAsFinished(); this is
   // where we return data to PHP.
-  void unserialize(TypedValue& result) final {
-   auto res = GrpcUnaryCallResult::newInstance(std::move(data_));
-   tvCopy(make_tv<KindOfObject>(res.detach()), result);
+  void unserialize(TypedValue& result) override final {
+    auto deser = deser_.get();
+    if (deser) {
+      SliceList slices;
+      deser->Slices(&slices);
+      size_t total = 0;
+      for (auto s : slices) {
+        total += s.second;
+      }
+      auto buf = StringData::Make(total);
+      auto pos = buf->mutableData();
+      for (auto s : slices) {
+        std::copy_n(s.first, s.second, pos);
+        pos += s.second;
+      }
+
+      buf->setSize(total);
+      data_->resp_ = String(buf);
+    }
+    auto res = GrpcUnaryCallResult::newInstance(std::move(data_));
+    tvCopy(make_tv<KindOfObject>(res.detach()), result);
   }
   std::unique_ptr<UnaryCallResultData> data_;
+  std::unique_ptr<Deserializer> deser_;
   const String req_;
 };
 
