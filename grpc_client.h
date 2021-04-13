@@ -1,26 +1,43 @@
 #ifndef GRPC_CLIENT_H__
 #define GRPC_CLIENT_H__
 
+struct Status {
+  int code_;
+  std::string message_;
+  std::string details_;
+  bool Ok() const;
+};
+
 typedef std::vector<std::pair<const uint8_t*, size_t>> SliceList;
 
 struct Deserializer {
-  virtual void Slices(SliceList*) = 0;
+  virtual Status Slices(SliceList*) = 0;
+};
+
+struct ClientContext {
 };
 
 struct GrpcClientUnaryResultEvent {
-  // Invoked when status is available.
-  virtual void Status(int code, const std::string& message, const std::string& details) = 0;
   // Invoked when the request content is being requested by the caller.
   virtual void FillRequest(const void**, size_t*) const = 0;
   
-  // Invoked when the response is available, receiver takes ownership of the
-  // deserializer.
+  // Invoked when the response is available.
   virtual void Response(std::unique_ptr<Deserializer>) = 0;
 
   // Invoked on completion.
-  virtual void Done() = 0;
+  virtual void Done(Status s) = 0; // TODO parameter should be const ref?
 };
 
-void GrpcClientUnaryCall(GrpcClientUnaryResultEvent*);
+struct UnaryCallParams {
+  std::string target_;
+  std::string method_;
+  std::map<std::string, std::vector<std::string>> md_;
+  int64_t timeout_micros_;
+  UnaryCallParams() : timeout_micros_(0) {};
+};
+
+std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams&, GrpcClientUnaryResultEvent*);
+
+void GrpcClientInit();
 
 #endif // GRPC_CLIENT_H__

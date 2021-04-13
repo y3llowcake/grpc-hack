@@ -34,7 +34,11 @@ final class GrpcUnaryCallResult {
 }
 
 <<__HipHopSpecific, __Native>>
-function grpc_unary_call(string $data): Awaitable<GrpcUnaryCallResult>;
+	function grpc_unary_call(
+		string $target,
+		string $method,
+		string $data,
+	): Awaitable<GrpcUnaryCallResult>;
 //function grpc_unary_call(string $data): Awaitable<Status>;
 
 //function grpc_unary_call(string $data): UnaryCallResult

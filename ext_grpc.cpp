@@ -11,10 +11,10 @@
 namespace HPHP {
 
 struct UnaryCallResultData {
-  int status_code_;
-  std::string status_message_;
-  std::string status_details_;
+  Status status_;
   String resp_;
+  std::unique_ptr<ClientContext> ctx_;
+  UnaryCallResultData() : resp_("") {}
 };
 
 struct GrpcUnaryCallResult {
@@ -47,17 +47,17 @@ const StaticString GrpcUnaryCallResult::s_className("GrpcUnaryCallResult");
 
 static int HHVM_METHOD(GrpcUnaryCallResult, StatusCode) {
   auto* d = Native::data<GrpcUnaryCallResult>(this_);
-	return d->data_->status_code_;
+	return d->data_->status_.code_;
 }
 
 static String HHVM_METHOD(GrpcUnaryCallResult, StatusMessage) {
   auto* d = Native::data<GrpcUnaryCallResult>(this_);
-	return d->data_->status_message_;
+	return d->data_->status_.message_;
 }
 
 static String HHVM_METHOD(GrpcUnaryCallResult, StatusDetails) {
   auto* d = Native::data<GrpcUnaryCallResult>(this_);
-	return d->data_->status_details_;
+	return d->data_->status_.details_;
 }
 
 static String HHVM_METHOD(GrpcUnaryCallResult, Response) {
@@ -71,8 +71,10 @@ struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
     data_(std::make_unique<UnaryCallResultData>()),
     req_(req) {}
 
-  void Done() override {
+  void Done(Status s) override {
+    data_->status_ = s;
     markAsFinished();
+    // TODO release req_ here?
   }
 
   void FillRequest(const void** c, size_t* l) const override {
@@ -83,69 +85,61 @@ struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
   void Response(std::unique_ptr<Deserializer> d) override {
     deser_ = std::move(d);
   }
-/*  void ResponseAlloc(size_t l) override {
 
-    std::cout << "wutang " << l << "\n";
-    //data_->resp_.reset(StringData::Make(l));
-    data_->resp_.reserve(l);
-    //data_->resp_ = StringData::Make(l);
-    std::cout << "forever\n";
-  }
-
-  void ResponseAppend(const char* c, size_t l) override {
-
-    std::cout <<"never say\n";
-    data_->resp_.get()->append(folly::StringPiece(c, l));
-    //data_->resp_->append(folly::StringPiece(c, l));
-    std::cout <<"never\n";
-  }*/
-
-  void Status(int status_code, const std::string& status_message, const std::string& status_details) override {
-    data_->status_code_ = status_code;
-    data_->status_message_ = status_message;
-    data_->status_details_ = status_details;
-  }
-
+  std::unique_ptr<UnaryCallResultData> data_;
+  std::unique_ptr<Deserializer> deser_;
+  const String req_;
  protected:
   // TODO abandon() -> ctx->TryCancel();
 
   // Invoked by the ASIO Framework after we have markAsFinished(); this is
   // where we return data to PHP.
   void unserialize(TypedValue& result) override final {
-    auto deser = deser_.get();
-    if (deser) {
+    if (deser_) {
       SliceList slices;
-      deser->Slices(&slices);
-      size_t total = 0;
-      for (auto s : slices) {
-        total += s.second;
-      }
-      auto buf = StringData::Make(total);
-      auto pos = buf->mutableData();
-      for (auto s : slices) {
-        std::copy_n(s.first, s.second, pos);
-        pos += s.second;
-      }
+      auto status = deser_->Slices(&slices);
+      if (!status.Ok()) {
+        if (!data_->status_.Ok()) { // take first failure.
+          data_->status_ = status;
+        }
+      } else {
+        size_t total = 0;
+        for (auto s : slices) {
+          total += s.second;
+        }
+        auto buf = StringData::Make(total);
+        auto pos = buf->mutableData();
+        for (auto s : slices) {
+          std::copy_n(s.first, s.second, pos);
+          pos += s.second;
+        }
 
-      buf->setSize(total);
-      data_->resp_ = String(buf);
+        buf->setSize(total);
+        data_->resp_ = String(buf);
+        deser_.reset(nullptr); // free the grpc::ByteBuffer now.
+      }
     }
     auto res = GrpcUnaryCallResult::newInstance(std::move(data_));
     tvCopy(make_tv<KindOfObject>(res.detach()), result);
   }
-  std::unique_ptr<UnaryCallResultData> data_;
-  std::unique_ptr<Deserializer> deser_;
-  const String req_;
 };
 
-Object HHVM_FUNCTION(grpc_unary_call, const String& req) {
+Object HHVM_FUNCTION(grpc_unary_call,
+    const String& target,
+    const String& method,
+    const String& req) {
+  UnaryCallParams p;
+  p.target_ = target.toCppString();
+  p.method_ = method.toCppString();
   auto event = new GrpcEvent(req);
-  GrpcClientUnaryCall(event);
+  event->data_->ctx_ = std::move(GrpcClientUnaryCall(p, event));
   return Object{event->getWaitHandle()};
 }
 
 struct GrpcExtension : Extension {
-  GrpcExtension(): Extension("grpc", "0.0.1") {}
+  GrpcExtension(): Extension("grpc", "0.0.1") {
+    GrpcClientInit();
+  }
 
   void moduleInit() override {
     HHVM_FE(grpc_unary_call);

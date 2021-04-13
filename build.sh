@@ -18,4 +18,4 @@ bazel build :grpc_client_static
 cmake -D HHVM_DSO_TEST_MODE=1 -D GRPC_CLIENT_LIB=`realpath ./bazel-bin/grpc_client_static.a` .
 
 make
-PATH="${HHVM_SOURCE_ROOT}/hphp/hhvm/:$PATH" ./test/test.sh
+PATH="${HHVM_SOURCE_ROOT}/hphp/hhvm/:$PATH" ./hhvm_test/test.sh
