@@ -40,4 +40,6 @@ std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams&, GrpcC
 
 void GrpcClientInit();
 
+std::string GrpcClientDebug();
+
 #endif // GRPC_CLIENT_H__

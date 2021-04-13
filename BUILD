@@ -5,9 +5,13 @@ cc_library(
     srcs = ["grpc_client.cc"],
     hdrs = ["grpc_client.h"],
     linkstatic = True,
-    deps = ["@com_github_grpc_grpc//:grpc++"],
+    deps = [
+        "@com_github_grpc_grpc//:grpc++",
+        "@com_github_grpc_grpc//:grpc_base_c", # channelz/json etc.
+     ],
     # linkopts=['-static'],
     # linkshared = True,
+
     # linkopts = ['-ldl'],
 )
 

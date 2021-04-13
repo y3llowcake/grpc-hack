@@ -3,9 +3,17 @@
 #include <grpcpp/impl/codegen/client_callback.h>
 #include <grpcpp/impl/codegen/byte_buffer.h>
 
+#include "src/core/lib/surface/channel.h"
+#include "src/core/lib/json/json.h"
+
 #include "grpc_client.h"
 
 #include <unordered_map>
+
+struct ChannelRecord {
+  std::shared_ptr<grpc::Channel> channel_;
+  grpc_channel* core_channel_;
+};
 
 class ChannelStore {
 	public:
@@ -14,23 +22,48 @@ class ChannelStore {
         const std::string& name,
         const std::string& target) {
       std::lock_guard<std::mutex> guard(mu_);
-      auto ch = map_[name];
-      if (ch) {
-        return ch;
+      auto it = map_.find(name);
+      if (it != map_.end()) {
+        return it->second->channel_;
       }
-      ch = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
-      map_[name] = ch;
-      return ch;
+      //auto cch = grpc::InsecureChannelCredentials()->CreateChannelImpl(target, args);
+      // We do a more complicated form of the above so we can get access to the
+      // core channel pointer, which in turn can be used with channelz apis.
+      grpc::ChannelArguments args;
+      grpc_channel_args channel_args;
+      args.SetChannelArgs(&channel_args);
+
+      auto record = std::make_shared<ChannelRecord>();
+      record->core_channel_ = grpc_insecure_channel_create(target.c_str(), &channel_args, nullptr);
+      std::vector<std::unique_ptr<grpc::experimental::ClientInterceptorFactoryInterface>> interceptor_creators;
+      record->channel_ = ::grpc::CreateChannelInternal("", record->core_channel_, std::move(interceptor_creators));
+      map_[name] = record;
+      return record->channel_;
     }
+  std::string Debug() {
+    std::lock_guard<std::mutex> guard(mu_);
+    grpc_core::Json::Object o;
+    for(auto kv : map_) {
+      auto node = grpc_channel_get_channelz_node(kv.second->core_channel_);
+      o[kv.first] = node->RenderJson();
+    }
+    return grpc_core::Json(o).Dump(2);
+  }
+    // grpc_channel_get_channelz_node -> RendorJSON;
 	private:
     std::mutex mu_;
-    std::unordered_map<std::string, std::shared_ptr<grpc::Channel>> map_;
+    std::unordered_map<std::string, std::shared_ptr<ChannelRecord>> map_;
 };
 
 ChannelStore* ChannelStore::Singleton = nullptr;
 
 void GrpcClientInit() {
-      ChannelStore::Singleton = new ChannelStore();
+  grpc_init();
+  ChannelStore::Singleton = new ChannelStore();
+}
+
+std::string GrpcClientDebug() {
+  return ChannelStore::Singleton->Debug();
 }
 
 Status FromGrpcStatus(const grpc::Status s) {
@@ -40,8 +73,6 @@ Status FromGrpcStatus(const grpc::Status s) {
   r.details_ = s.error_details();
   return r;
 }
-
-// static const Status OK = FromGrpcStatus(grpc::Status::OK);
 
 bool Status::Ok() const {
   return code_ == grpc::OK;
@@ -67,7 +98,6 @@ std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams& p, Grp
       ctx->ctx_.AddMetadata(kv.first, v);
     }
   }
-  //auto meth = grpc::internal::RpcMethod("/helloworld.Greeter/SayHello", grpc::internal::RpcMethod::NORMAL_RPC);
   auto meth = grpc::internal::RpcMethod(p.method_.c_str(), grpc::internal::RpcMethod::NORMAL_RPC);
   ::grpc::internal::CallbackUnaryCall<
     GrpcClientUnaryResultEvent,

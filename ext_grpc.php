@@ -1,19 +1,5 @@
 <?hh
 
-
-/*
-type Status = shape(
-	'code' => int,
-	'message' => ?string,
-	'details' => ?string,
-);
-
-type UnaryCallResult = shape(
-	'status' => Status,
-	'response' => ?string,
-);
- */
-
 <<__NativeData("GrpcUnaryCallResult")>> 
 final class GrpcUnaryCallResult {
 	private function __construct(): void {
@@ -39,6 +25,6 @@ final class GrpcUnaryCallResult {
 		string $method,
 		string $data,
 	): Awaitable<GrpcUnaryCallResult>;
-//function grpc_unary_call(string $data): Awaitable<Status>;
 
-//function grpc_unary_call(string $data): UnaryCallResult
+<<__HipHopSpecific, __Native>>
+function grpc_client_debug(): string;

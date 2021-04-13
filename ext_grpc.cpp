@@ -136,12 +136,18 @@ Object HHVM_FUNCTION(grpc_unary_call,
   return Object{event->getWaitHandle()};
 }
 
+String HHVM_FUNCTION(grpc_client_debug) {
+  return GrpcClientDebug();
+}
+
+
 struct GrpcExtension : Extension {
   GrpcExtension(): Extension("grpc", "0.0.1") {
     GrpcClientInit();
   }
 
   void moduleInit() override {
+    HHVM_FE(grpc_client_debug);
     HHVM_FE(grpc_unary_call);
     HHVM_ME(GrpcUnaryCallResult, StatusCode);
     HHVM_ME(GrpcUnaryCallResult, StatusMessage);
