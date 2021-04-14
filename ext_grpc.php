@@ -23,7 +23,9 @@ final class GrpcUnaryCallResult {
 	function grpc_unary_call(
 		string $target,
 		string $method,
-		string $data,
+		int $timeout_micros,
+		dict<string, vec<string>> $metadata,
+		string $request,
 	): Awaitable<GrpcUnaryCallResult>;
 
 <<__HipHopSpecific, __Native>>

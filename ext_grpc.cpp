@@ -5,6 +5,7 @@
 #include "hphp/runtime/base/array-init.h"
 #include "hphp/runtime/ext/asio/asio-external-thread-event.h"
 #include "hphp/runtime/vm/native-data.h"
+#include "hphp/runtime/base/array-iterator.h"
 
 #include <grpc_client.h>
 
@@ -90,8 +91,6 @@ struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
   std::unique_ptr<Deserializer> deser_;
   const String req_;
  protected:
-  // TODO abandon() -> ctx->TryCancel();
-
   // Invoked by the ASIO Framework after we have markAsFinished(); this is
   // where we return data to PHP.
   void unserialize(TypedValue& result) override final {
@@ -127,10 +126,22 @@ struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
 Object HHVM_FUNCTION(grpc_unary_call,
     const String& target,
     const String& method,
+    int timeout_micros,
+    const Array& metadata,
     const String& req) {
   UnaryCallParams p;
   p.target_ = target.toCppString();
   p.method_ = method.toCppString();
+  p.timeout_micros_ = timeout_micros;
+  for (auto it = metadata.begin(); !it.end(); it.next()) {
+    auto k = it.first().toString().toCppString();
+    if (p.md_.find(k) == p.md_.end()) {
+      p.md_[k] = std::vector<std::string>();
+    }
+    for (auto vit = it.second().toArray().begin(); !vit.end(); vit.next()) {
+      p.md_[k].push_back(vit.second().toString().toCppString());
+    }
+  }
   auto event = new GrpcEvent(req);
   event->data_->ctx_ = std::move(GrpcClientUnaryCall(p, event));
   return Object{event->getWaitHandle()};

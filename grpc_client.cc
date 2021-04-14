@@ -79,6 +79,17 @@ bool Status::Ok() const {
 }
 
 struct ClientContextImpl : ClientContext {
+  void Metadata(Md* md) {
+    // TODO
+    /*for(auto kv : ctx_.GetServerInitialMetadata()) {
+
+    }*/
+  }
+
+  std::string Peer() override {
+    return ctx_.peer();
+  }
+
   grpc::ClientContext ctx_;
 };
 
@@ -95,6 +106,7 @@ std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams& p, Grp
   }
   for (auto kv : p.md_) {
     for (auto v : kv.second) {
+      printf("metadata %s %s", kv.first.c_str(), v.c_str());
       ctx->ctx_.AddMetadata(kv.first, v);
     }
   }

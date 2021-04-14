@@ -1,6 +1,9 @@
 #ifndef GRPC_CLIENT_H__
 #define GRPC_CLIENT_H__
 
+#include  <unordered_map>
+#include  <vector>
+
 struct Status {
   int code_;
   std::string message_;
@@ -14,7 +17,11 @@ struct Deserializer {
   virtual Status Slices(SliceList*) = 0;
 };
 
+typedef std::unordered_map<std::string, std::vector<std::string>> Md;
+
 struct ClientContext {
+  virtual void Metadata(Md*) = 0;
+  virtual std::string Peer() = 0;
 };
 
 struct GrpcClientUnaryResultEvent {
