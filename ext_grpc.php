@@ -17,23 +17,46 @@ final class GrpcUnaryCallResult {
 
 	<<__HipHopSpecific, __Native>>
 	public function Response(): string;
+
+	<<__HipHopSpecific, __Native>>
+	public function Peer(): string;
+
+	// TODO, peer and metadata.
 }
+
+type UnaryCallOpt = shape();
+type ChannelCreateOpt = shape();
 
 <<__NativeData("ChannelData")>>
 class GrpcChannel {
 	<<__Native>>
-	public function __construct(string $name, string $target);
+	private function __construct(
+		string $name,
+		string $target,
+		darray $opt
+	);
+
+	<<__Memoize>>
+	public static function Create(string $name, string $target, ChannelCreateOpt $opt = shape()): GrpcChannel {
+		return new GrpcChannel($name, $target, Shapes::toArray($opt));
+	}
 
 	<<__Native>>
-	function UnaryCall(
+	private function UnaryCallInternal(
 		string $method,
-		int $timeout_micros,
-		dict<string, vec<string>> $metadata,
 		string $request,
+		darray $opt,
 	): Awaitable<GrpcUnaryCallResult>;
+
+
+	public function UnaryCall(
+		string $method,
+		string $request,
+		UnaryCallOpt $opt = shape(),
+	): Awaitable<GrpcUnaryCallResult> {
+		return $this->UnaryCallInternal($method, $request, Shapes::toArray($opt));
+	}
 	
 	<<__Native>>
 	function Debug(): string;
 }
-
-

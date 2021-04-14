@@ -44,12 +44,15 @@ struct UnaryCallParams {
   UnaryCallParams() : timeout_micros_(0) {};
 };
 
+struct ChannelCreateParams {
+};
+
 struct Channel {
   virtual std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams&, GrpcClientUnaryResultEvent*) = 0;
   virtual std::string Debug() = 0;
 };
 
-std::shared_ptr<Channel> GetChannel(const std::string& name, const std::string& target);
+std::shared_ptr<Channel> GetChannel(const std::string& name, const std::string& target, const ChannelCreateParams& params);
 
 void GrpcClientInit();
 

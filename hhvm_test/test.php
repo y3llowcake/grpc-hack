@@ -3,8 +3,8 @@
 <<__EntryPoint>>
 function main(): void {
 	echo "test start\n";
-	$channel = new GrpcChannel('foo', 'localhost:50051');
-	$r = HH\Asio\join($channel->UnaryCall('/helloworld.HelloWorldService/SayHello', 0, dict['foo' => vec['bar', 'fizz']], ''));
+	$channel = GrpcChannel::Create('foo', 'localhost:50051');
+	$r = HH\Asio\join($channel->UnaryCall('/helloworld.HelloWorldService/SayHello', ''));
 	//$r = HH\Asio\join(grpc_unary_call('hello world'));
 	echo "code: {$r->StatusCode()}\n";
 	echo "message: '{$r->StatusMessage()}'\n";

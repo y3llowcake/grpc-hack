@@ -31,7 +31,8 @@ class ChannelStore {
 
     std::shared_ptr<ChannelImpl> GetChannel(
         const std::string& name,
-        const std::string& target) {
+        const std::string& target,
+        const ChannelCreateParams& p) {
       std::lock_guard<std::mutex> guard(mu_);
       auto it = map_.find(name);
       if (it != map_.end()) {
@@ -74,8 +75,8 @@ void GrpcClientInit() {
   ChannelStore::Singleton = new ChannelStore();
 }
 
-std::shared_ptr<Channel> GetChannel(const std::string& name, const std::string& target) {
-  return ChannelStore::Singleton->GetChannel(name, target);
+std::shared_ptr<Channel> GetChannel(const std::string& name, const std::string& target, const ChannelCreateParams& p) {
+  return ChannelStore::Singleton->GetChannel(name, target, p);
 }
 
 /*std::string GrpcClientDebug() {
