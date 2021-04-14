@@ -14,7 +14,7 @@ struct ChannelImpl : Channel {
   std::shared_ptr<grpc::Channel> channel_;
   grpc_channel* core_channel_; // not owned
   
-  std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams& p, GrpcClientUnaryResultEvent* ev) override;
+  std::shared_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams& p, GrpcClientUnaryResultEvent* ev) override;
 
   grpc_core::Json DebugJson() {
     return grpc_channel_get_channelz_node(core_channel_)->RenderJson();
@@ -104,16 +104,17 @@ struct ClientContextImpl : ClientContext {
   }
 
   std::string Peer() override {
-    return ctx_.peer();
+    return peer_;
   }
 
+  std::string peer_;
   grpc::ClientContext ctx_;
 };
 
 // TODO: for sreq, what happens if the request is terminated before we start
 // copying the contents onto the wire? Do I need to copy early?
-std::unique_ptr<ClientContext> ChannelImpl::GrpcClientUnaryCall(const UnaryCallParams& p, GrpcClientUnaryResultEvent* ev) {
-  std::unique_ptr<ClientContextImpl> ctx(new ClientContextImpl());
+std::shared_ptr<ClientContext> ChannelImpl::GrpcClientUnaryCall(const UnaryCallParams& p, GrpcClientUnaryResultEvent* ev) {
+  std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
   if (p.timeout_micros_ > 0) {
     auto to = gpr_time_add(
         gpr_now(GPR_CLOCK_MONOTONIC),
@@ -130,7 +131,8 @@ std::unique_ptr<ClientContext> ChannelImpl::GrpcClientUnaryCall(const UnaryCallP
     GrpcClientUnaryResultEvent,
     GrpcClientUnaryResultEvent,
     GrpcClientUnaryResultEvent,
-    GrpcClientUnaryResultEvent>(channel_.get(), meth, &ctx->ctx_, ev, ev, [ev](grpc::Status s) {
+    GrpcClientUnaryResultEvent>(channel_.get(), meth, &ctx->ctx_, ev, ev, [ctx, ev](grpc::Status s) {
+      ctx->peer_ = ctx->ctx_.peer();
       ev->Done(FromGrpcStatus(s));
   });
   return std::move(ctx);

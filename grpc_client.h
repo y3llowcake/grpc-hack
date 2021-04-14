@@ -48,7 +48,7 @@ struct ChannelCreateParams {
 };
 
 struct Channel {
-  virtual std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams&, GrpcClientUnaryResultEvent*) = 0;
+  virtual std::shared_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams&, GrpcClientUnaryResultEvent*) = 0;
   virtual std::string Debug() = 0;
 };
 

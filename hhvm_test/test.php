@@ -11,6 +11,7 @@ function main(): void {
 	$resp = $r->Response();
 	echo "response length: " . strlen($resp)."\n";
 	echo "response: '{$resp}'\n";
+	echo "peer: '" .$r->Peer(). "'\n";
 	echo $channel->Debug() . "\n";
 	echo "test fin\n";
 }

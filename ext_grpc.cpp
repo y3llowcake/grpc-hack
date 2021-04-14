@@ -15,7 +15,7 @@ struct UnaryCallResultData {
   Status status_;
   String resp_;
   String peer_;
-  std::unique_ptr<ClientContext> ctx_;
+  std::shared_ptr<ClientContext> ctx_;
   UnaryCallResultData() : resp_("") {}
 };
 
@@ -69,7 +69,7 @@ static String HHVM_METHOD(GrpcUnaryCallResult, Response) {
 
 static String HHVM_METHOD(GrpcUnaryCallResult, Peer) {
   auto* d = Native::data<GrpcUnaryCallResult>(this_);
-	return String(d->data_->peer_);
+	return String(d->data_->ctx_->Peer()); 
 }
 
 struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
@@ -80,7 +80,6 @@ struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
 
   void Done(Status s) override {
     data_->status_ = s;
-    // data_->peer_ = data_->ctx_->Peer(); // TODO this is broken
     markAsFinished();
     // TODO release req_ here?
   }
