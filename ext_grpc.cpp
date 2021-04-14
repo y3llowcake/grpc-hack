@@ -123,14 +123,17 @@ struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
   }
 };
 
-Object HHVM_FUNCTION(grpc_unary_call,
-    const String& target,
-    const String& method,
-    int timeout_micros,
-    const Array& metadata,
-    const String& req) {
+struct ChannelData {
+  std::shared_ptr<Channel> channel_;
+};
+
+static void HHVM_METHOD(GrpcChannel, __construct, const String& name, const String& target) {
+  auto* d = Native::data<ChannelData>(this_);
+  d->channel_ = GetChannel(name.toCppString(), target.toCppString());
+}
+
+static Object HHVM_METHOD(GrpcChannel, UnaryCall, const String& method, int timeout_micros, const Array& metadata, const String& req) {
   UnaryCallParams p;
-  p.target_ = target.toCppString();
   p.method_ = method.toCppString();
   p.timeout_micros_ = timeout_micros;
   for (auto it = metadata.begin(); !it.end(); it.next()) {
@@ -143,23 +146,30 @@ Object HHVM_FUNCTION(grpc_unary_call,
     }
   }
   auto event = new GrpcEvent(req);
-  event->data_->ctx_ = std::move(GrpcClientUnaryCall(p, event));
+  auto* d = Native::data<ChannelData>(this_);
+  event->data_->ctx_ = std::move(d->channel_->GrpcClientUnaryCall(p, event));
   return Object{event->getWaitHandle()};
 }
 
-String HHVM_FUNCTION(grpc_client_debug) {
-  return GrpcClientDebug();
+static String HHVM_METHOD(GrpcChannel, Debug) {
+  auto* d = Native::data<ChannelData>(this_);
+  return d->channel_->Debug();
 }
 
 
+const StaticString s_ChannelData("ChannelData");
 struct GrpcExtension : Extension {
   GrpcExtension(): Extension("grpc", "0.0.1") {
     GrpcClientInit();
   }
 
   void moduleInit() override {
-    HHVM_FE(grpc_client_debug);
-    HHVM_FE(grpc_unary_call);
+    HHVM_ME(GrpcChannel, __construct);
+    HHVM_ME(GrpcChannel, UnaryCall);
+    HHVM_ME(GrpcChannel, Debug);
+    Native::registerNativeDataInfo<ChannelData>(s_ChannelData.get());
+
+
     HHVM_ME(GrpcUnaryCallResult, StatusCode);
     HHVM_ME(GrpcUnaryCallResult, StatusMessage);
     HHVM_ME(GrpcUnaryCallResult, StatusDetails);

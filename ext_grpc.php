@@ -19,14 +19,21 @@ final class GrpcUnaryCallResult {
 	public function Response(): string;
 }
 
-<<__HipHopSpecific, __Native>>
-	function grpc_unary_call(
-		string $target,
+<<__NativeData("ChannelData")>>
+class GrpcChannel {
+	<<__Native>>
+	public function __construct(string $name, string $target);
+
+	<<__Native>>
+	function UnaryCall(
 		string $method,
 		int $timeout_micros,
 		dict<string, vec<string>> $metadata,
 		string $request,
 	): Awaitable<GrpcUnaryCallResult>;
+	
+	<<__Native>>
+	function Debug(): string;
+}
 
-<<__HipHopSpecific, __Native>>
-function grpc_client_debug(): string;
+

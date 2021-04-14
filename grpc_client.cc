@@ -10,21 +10,32 @@
 
 #include <unordered_map>
 
-struct ChannelRecord {
+struct ChannelImpl : Channel {
   std::shared_ptr<grpc::Channel> channel_;
-  grpc_channel* core_channel_;
+  grpc_channel* core_channel_; // not owned
+  
+  std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams& p, GrpcClientUnaryResultEvent* ev) override;
+
+  grpc_core::Json DebugJson() {
+    return grpc_channel_get_channelz_node(core_channel_)->RenderJson();
+  }
+
+  std::string Debug() override {
+    return DebugJson().Dump(2);
+  }
 };
 
 class ChannelStore {
 	public:
     static ChannelStore* Singleton;
-    std::shared_ptr<grpc::Channel> Channel(
+
+    std::shared_ptr<ChannelImpl> GetChannel(
         const std::string& name,
         const std::string& target) {
       std::lock_guard<std::mutex> guard(mu_);
       auto it = map_.find(name);
       if (it != map_.end()) {
-        return it->second->channel_;
+        return it->second;
       }
       //auto cch = grpc::InsecureChannelCredentials()->CreateChannelImpl(target, args);
       // We do a more complicated form of the above so we can get access to the
@@ -33,26 +44,27 @@ class ChannelStore {
       grpc_channel_args channel_args;
       args.SetChannelArgs(&channel_args);
 
-      auto record = std::make_shared<ChannelRecord>();
+      auto record = std::make_shared<ChannelImpl>();
       record->core_channel_ = grpc_insecure_channel_create(target.c_str(), &channel_args, nullptr);
       std::vector<std::unique_ptr<grpc::experimental::ClientInterceptorFactoryInterface>> interceptor_creators;
       record->channel_ = ::grpc::CreateChannelInternal("", record->core_channel_, std::move(interceptor_creators));
       map_[name] = record;
-      return record->channel_;
+      return record;
     }
-  std::string Debug() {
-    std::lock_guard<std::mutex> guard(mu_);
-    grpc_core::Json::Object o;
-    for(auto kv : map_) {
-      auto node = grpc_channel_get_channelz_node(kv.second->core_channel_);
-      o[kv.first] = node->RenderJson();
+
+  /*
+    std::string Debug() override {
+      std::lock_guard<std::mutex> guard(mu_);
+      grpc_core::Json::Object o;
+      for(auto kv : map_) {
+        o[kv.first] = kv.second->DebugJson();
+      }
+      return grpc_core::Json(o).Dump(2);
     }
-    return grpc_core::Json(o).Dump(2);
-  }
-    // grpc_channel_get_channelz_node -> RendorJSON;
-	private:
+	*/
+  private:
     std::mutex mu_;
-    std::unordered_map<std::string, std::shared_ptr<ChannelRecord>> map_;
+    std::unordered_map<std::string, std::shared_ptr<ChannelImpl>> map_;
 };
 
 ChannelStore* ChannelStore::Singleton = nullptr;
@@ -62,9 +74,13 @@ void GrpcClientInit() {
   ChannelStore::Singleton = new ChannelStore();
 }
 
-std::string GrpcClientDebug() {
-  return ChannelStore::Singleton->Debug();
+std::shared_ptr<Channel> GetChannel(const std::string& name, const std::string& target) {
+  return ChannelStore::Singleton->GetChannel(name, target);
 }
+
+/*std::string GrpcClientDebug() {
+  return ChannelStore::Singleton->Debug();
+}*/
 
 Status FromGrpcStatus(const grpc::Status s) {
   Status r;
@@ -95,8 +111,7 @@ struct ClientContextImpl : ClientContext {
 
 // TODO: for sreq, what happens if the request is terminated before we start
 // copying the contents onto the wire? Do I need to copy early?
-std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams& p, GrpcClientUnaryResultEvent* ev) {
-  auto ch = ChannelStore::Singleton->Channel(p.target_, p.target_);
+std::unique_ptr<ClientContext> ChannelImpl::GrpcClientUnaryCall(const UnaryCallParams& p, GrpcClientUnaryResultEvent* ev) {
   std::unique_ptr<ClientContextImpl> ctx(new ClientContextImpl());
   if (p.timeout_micros_ > 0) {
     auto to = gpr_time_add(
@@ -106,7 +121,6 @@ std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams& p, Grp
   }
   for (auto kv : p.md_) {
     for (auto v : kv.second) {
-      printf("metadata %s %s", kv.first.c_str(), v.c_str());
       ctx->ctx_.AddMetadata(kv.first, v);
     }
   }
@@ -115,7 +129,7 @@ std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams& p, Grp
     GrpcClientUnaryResultEvent,
     GrpcClientUnaryResultEvent,
     GrpcClientUnaryResultEvent,
-    GrpcClientUnaryResultEvent>(ch.get(), meth, &ctx->ctx_, ev, ev, [ev](grpc::Status s) {
+    GrpcClientUnaryResultEvent>(channel_.get(), meth, &ctx->ctx_, ev, ev, [ev](grpc::Status s) {
       ev->Done(FromGrpcStatus(s));
   });
   return std::move(ctx);

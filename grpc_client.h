@@ -1,8 +1,10 @@
 #ifndef GRPC_CLIENT_H__
 #define GRPC_CLIENT_H__
 
-#include  <unordered_map>
-#include  <vector>
+#include <string>
+#include <memory>
+#include <unordered_map>
+#include <vector>
 
 struct Status {
   int code_;
@@ -25,10 +27,10 @@ struct ClientContext {
 };
 
 struct GrpcClientUnaryResultEvent {
-  // Invoked when the request content is being requested by the caller.
+  // Invoked when the request content is being serialized to the wire.
   virtual void FillRequest(const void**, size_t*) const = 0;
   
-  // Invoked when the response is available.
+  // Invoked when the response is available to be deserialized from the wire.
   virtual void Response(std::unique_ptr<Deserializer>) = 0;
 
   // Invoked on completion.
@@ -36,17 +38,19 @@ struct GrpcClientUnaryResultEvent {
 };
 
 struct UnaryCallParams {
-  std::string target_;
   std::string method_;
-  std::map<std::string, std::vector<std::string>> md_;
+  Md md_;
   int64_t timeout_micros_;
   UnaryCallParams() : timeout_micros_(0) {};
 };
 
-std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams&, GrpcClientUnaryResultEvent*);
+struct Channel {
+  virtual std::unique_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams&, GrpcClientUnaryResultEvent*) = 0;
+  virtual std::string Debug() = 0;
+};
+
+std::shared_ptr<Channel> GetChannel(const std::string& name, const std::string& target);
 
 void GrpcClientInit();
-
-std::string GrpcClientDebug();
 
 #endif // GRPC_CLIENT_H__
