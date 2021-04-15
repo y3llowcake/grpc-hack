@@ -11,6 +11,31 @@
 
 namespace HPHP {
 
+#define NATIVE_DATA_CLASS(cls, ptr)                                            \
+  struct cls {                                                                 \
+    static Class *s_class;                                                     \
+    static const StaticString s_className;                                     \
+    static Class *getClass() {                                                 \
+      if (s_class == nullptr) {                                                \
+        s_class = Class::lookup(s_className.get());                            \
+        assertx(s_class);                                                      \
+      }                                                                        \
+      return s_class;                                                          \
+    }                                                                          \
+    static Object newInstance(ptr data) {                                      \
+      Object obj{getClass()};                                                  \
+      auto *d = Native::data<cls>(obj);                                        \
+      d->data_ = std::move(data);                                              \
+      return obj;                                                              \
+    }                                                                          \
+    cls(){};                                                                   \
+    ptr data_;                                                                 \
+    cls(const cls &) = delete;                                                 \
+    cls &operator=(const cls &) = delete;                                      \
+  };                                                                           \
+  Class *cls::s_class = nullptr;                                               \
+  const StaticString cls::s_className(#cls);
+
 struct UnaryCallResultData {
   Status status_;
   String resp_;
@@ -19,33 +44,7 @@ struct UnaryCallResultData {
   UnaryCallResultData() : resp_("") {}
 };
 
-struct GrpcUnaryCallResult {
-  static Class *s_class;
-  static const StaticString s_className;
-  static Class *getClass() {
-    if (s_class == nullptr) {
-      s_class = Class::lookup(s_className.get());
-      assertx(s_class);
-    }
-    return s_class;
-  }
-
-  GrpcUnaryCallResult(){};
-  static Object newInstance(std::unique_ptr<UnaryCallResultData> data) {
-    Object obj{getClass()};
-    auto *d = Native::data<GrpcUnaryCallResult>(obj);
-    d->data_ = std::move(data);
-    return obj;
-  }
-
-  std::unique_ptr<UnaryCallResultData> data_;
-
-  GrpcUnaryCallResult(const GrpcUnaryCallResult &) = delete;
-  GrpcUnaryCallResult &operator=(const GrpcUnaryCallResult &) = delete;
-};
-
-Class *GrpcUnaryCallResult::s_class = nullptr;
-const StaticString GrpcUnaryCallResult::s_className("GrpcUnaryCallResult");
+NATIVE_DATA_CLASS(GrpcUnaryCallResult, std::unique_ptr<UnaryCallResultData>);
 
 static int HHVM_METHOD(GrpcUnaryCallResult, StatusCode) {
   auto *d = Native::data<GrpcUnaryCallResult>(this_);
