@@ -133,8 +133,21 @@ struct ChannelData {
   std::shared_ptr<Channel> channel_;
 };
 
+const auto optMaxSend = HPHP::StaticString("max_send_message_size");
+const auto optMaxReceive = HPHP::StaticString("max_receive_message_size");
+const auto optLbPolicy = HPHP::StaticString("lb_policy_name");
 static void HHVM_METHOD(GrpcChannel, __construct, const String& name, const String& target, const Array& opt) {
   ChannelCreateParams p;
+  if (opt.exists(optMaxSend)) {
+    p.max_send_message_size_ = opt[optMaxSend].toInt64();
+  }
+  if (opt.exists(optMaxReceive)) {
+    p.max_receive_message_size_ = opt[optMaxReceive].toInt64();
+  }
+  if (opt.exists(optLbPolicy)) {
+    p.lb_policy_name_ = opt[optLbPolicy].toString().toCppString();
+  }
+
   auto* d = Native::data<ChannelData>(this_);
   d->channel_ = GetChannel(name.toCppString(), target.toCppString(), p);
 }

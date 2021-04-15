@@ -3,7 +3,7 @@
 <<__EntryPoint>>
 function main(): void {
 	echo "test start\n";
-	$channel = GrpcChannel::Create('foo', 'localhost:50051');
+	$channel = GrpcChannel::Create('foo', 'localhost:50051', shape('lb_policy_name' => 'round_robin'));
 	$r = HH\Asio\join($channel->UnaryCall('/helloworld.HelloWorldService/SayHello', ''));
 	//$r = HH\Asio\join(grpc_unary_call('hello world'));
 	echo "code: {$r->StatusCode()}\n";

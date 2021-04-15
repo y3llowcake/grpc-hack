@@ -45,6 +45,10 @@ struct UnaryCallParams {
 };
 
 struct ChannelCreateParams {
+  int max_send_message_size_;
+  int max_receive_message_size_;
+  std::string lb_policy_name_;
+  ChannelCreateParams() : max_send_message_size_(0), max_receive_message_size_(0) {};
 };
 
 struct Channel {

@@ -24,8 +24,15 @@ final class GrpcUnaryCallResult {
 	// TODO, peer and metadata.
 }
 
-type UnaryCallOpt = shape();
-type ChannelCreateOpt = shape();
+type UnaryCallOpt = shape(
+	'timeout_micros' => ?int,
+	'metadata' => ?dict<string, vec<string>>,
+);
+type ChannelCreateOpt = shape(
+	'max_send_message_size' => ?int,
+	'max_receive_message_size' => ?int,
+	'lb_policy_name' => ?string,
+);
 
 <<__NativeData("ChannelData")>>
 class GrpcChannel {

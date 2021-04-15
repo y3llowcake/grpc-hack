@@ -42,6 +42,17 @@ class ChannelStore {
       // We do a more complicated form of the above so we can get access to the
       // core channel pointer, which in turn can be used with channelz apis.
       grpc::ChannelArguments args;
+      if (p.max_send_message_size_ > 0) {
+        args.SetMaxSendMessageSize(p.max_send_message_size_);
+      }
+      if (p.max_receive_message_size_ > 0) {
+        args.SetMaxSendMessageSize(p.max_receive_message_size_);
+      }
+      if (!p.lb_policy_name_.empty()) {
+        args.SetLoadBalancingPolicyName(p.lb_policy_name_);
+      }
+
+
       grpc_channel_args channel_args;
       args.SetChannelArgs(&channel_args);
 
