@@ -1,8 +1,8 @@
 #ifndef GRPC_CLIENT_H__
 #define GRPC_CLIENT_H__
 
-#include <string>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -13,23 +13,23 @@ struct Status {
   bool Ok() const;
 };
 
-typedef std::vector<std::pair<const uint8_t*, size_t>> SliceList;
+typedef std::vector<std::pair<const uint8_t *, size_t>> SliceList;
 
 struct Deserializer {
-  virtual Status Slices(SliceList*) = 0;
+  virtual Status Slices(SliceList *) = 0;
 };
 
 typedef std::unordered_map<std::string, std::vector<std::string>> Md;
 
 struct ClientContext {
-  virtual void Metadata(Md*) = 0;
+  virtual void Metadata(Md *) = 0;
   virtual std::string Peer() = 0;
 };
 
 struct GrpcClientUnaryResultEvent {
   // Invoked when the request content is being serialized to the wire.
-  virtual void FillRequest(const void**, size_t*) const = 0;
-  
+  virtual void FillRequest(const void **, size_t *) const = 0;
+
   // Invoked when the response is available to be deserialized from the wire.
   virtual void Response(std::unique_ptr<Deserializer>) = 0;
 
@@ -41,22 +41,27 @@ struct UnaryCallParams {
   std::string method_;
   Md md_;
   int64_t timeout_micros_;
-  UnaryCallParams() : timeout_micros_(0) {};
+  UnaryCallParams() : timeout_micros_(0){};
 };
 
 struct ChannelCreateParams {
   int max_send_message_size_;
   int max_receive_message_size_;
   std::string lb_policy_name_;
-  ChannelCreateParams() : max_send_message_size_(0), max_receive_message_size_(0) {};
+  ChannelCreateParams()
+      : max_send_message_size_(0), max_receive_message_size_(0){};
 };
 
 struct Channel {
-  virtual std::shared_ptr<ClientContext> GrpcClientUnaryCall(const UnaryCallParams&, GrpcClientUnaryResultEvent*) = 0;
+  virtual std::shared_ptr<ClientContext>
+  GrpcClientUnaryCall(const UnaryCallParams &,
+                      GrpcClientUnaryResultEvent *) = 0;
   virtual std::string Debug() = 0;
 };
 
-std::shared_ptr<Channel> GetChannel(const std::string& name, const std::string& target, const ChannelCreateParams& params);
+std::shared_ptr<Channel> GetChannel(const std::string &name,
+                                    const std::string &target,
+                                    const ChannelCreateParams &params);
 
 void GrpcClientInit();
 

@@ -1,11 +1,11 @@
 #include <iostream>
 
-#include "hphp/runtime/ext/extension.h"
-#include "hphp/runtime/base/builtin-functions.h"
 #include "hphp/runtime/base/array-init.h"
-#include "hphp/runtime/ext/asio/asio-external-thread-event.h"
-#include "hphp/runtime/vm/native-data.h"
 #include "hphp/runtime/base/array-iterator.h"
+#include "hphp/runtime/base/builtin-functions.h"
+#include "hphp/runtime/ext/asio/asio-external-thread-event.h"
+#include "hphp/runtime/ext/extension.h"
+#include "hphp/runtime/vm/native-data.h"
 
 #include <grpc_client.h>
 
@@ -20,63 +20,62 @@ struct UnaryCallResultData {
 };
 
 struct GrpcUnaryCallResult {
-	static Class* s_class;
-  static const StaticString s_className;	
-	static Class* getClass() {
-		if (s_class == nullptr) {
-			s_class = Class::lookup(s_className.get());
-			assertx(s_class);
-		}
-		return s_class;
-	}
+  static Class *s_class;
+  static const StaticString s_className;
+  static Class *getClass() {
+    if (s_class == nullptr) {
+      s_class = Class::lookup(s_className.get());
+      assertx(s_class);
+    }
+    return s_class;
+  }
 
   GrpcUnaryCallResult(){};
-	static Object newInstance(std::unique_ptr<UnaryCallResultData> data) {
-		Object obj{getClass()};
-		auto* d = Native::data<GrpcUnaryCallResult>(obj);
-		d->data_ = std::move(data);
-		return obj;
-	}
+  static Object newInstance(std::unique_ptr<UnaryCallResultData> data) {
+    Object obj{getClass()};
+    auto *d = Native::data<GrpcUnaryCallResult>(obj);
+    d->data_ = std::move(data);
+    return obj;
+  }
 
   std::unique_ptr<UnaryCallResultData> data_;
 
-  GrpcUnaryCallResult(const GrpcUnaryCallResult&) = delete;
-  GrpcUnaryCallResult& operator=(const GrpcUnaryCallResult&) = delete;
+  GrpcUnaryCallResult(const GrpcUnaryCallResult &) = delete;
+  GrpcUnaryCallResult &operator=(const GrpcUnaryCallResult &) = delete;
 };
 
-Class* GrpcUnaryCallResult::s_class = nullptr;
+Class *GrpcUnaryCallResult::s_class = nullptr;
 const StaticString GrpcUnaryCallResult::s_className("GrpcUnaryCallResult");
 
 static int HHVM_METHOD(GrpcUnaryCallResult, StatusCode) {
-  auto* d = Native::data<GrpcUnaryCallResult>(this_);
-	return d->data_->status_.code_;
+  auto *d = Native::data<GrpcUnaryCallResult>(this_);
+  return d->data_->status_.code_;
 }
 
 static String HHVM_METHOD(GrpcUnaryCallResult, StatusMessage) {
-  auto* d = Native::data<GrpcUnaryCallResult>(this_);
-	return d->data_->status_.message_;
+  auto *d = Native::data<GrpcUnaryCallResult>(this_);
+  return d->data_->status_.message_;
 }
 
 static String HHVM_METHOD(GrpcUnaryCallResult, StatusDetails) {
-  auto* d = Native::data<GrpcUnaryCallResult>(this_);
-	return d->data_->status_.details_;
+  auto *d = Native::data<GrpcUnaryCallResult>(this_);
+  return d->data_->status_.details_;
 }
 
 static String HHVM_METHOD(GrpcUnaryCallResult, Response) {
-  auto* d = Native::data<GrpcUnaryCallResult>(this_);
-	return String(d->data_->resp_);
+  auto *d = Native::data<GrpcUnaryCallResult>(this_);
+  return String(d->data_->resp_);
 }
 
 static String HHVM_METHOD(GrpcUnaryCallResult, Peer) {
-  auto* d = Native::data<GrpcUnaryCallResult>(this_);
-	return String(d->data_->ctx_->Peer()); 
+  auto *d = Native::data<GrpcUnaryCallResult>(this_);
+  return String(d->data_->ctx_->Peer());
 }
 
 struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
- public:
-  GrpcEvent(const String& req):
-    data_(std::make_unique<UnaryCallResultData>()),
-    req_(req) {}
+public:
+  GrpcEvent(const String &req)
+      : data_(std::make_unique<UnaryCallResultData>()), req_(req) {}
 
   void Done(Status s) override {
     data_->status_ = s;
@@ -84,7 +83,7 @@ struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
     // TODO release req_ here?
   }
 
-  void FillRequest(const void** c, size_t* l) const override {
+  void FillRequest(const void **c, size_t *l) const override {
     *c = req_.data();
     *l = req_.size();
   }
@@ -96,10 +95,11 @@ struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
   std::unique_ptr<UnaryCallResultData> data_;
   std::unique_ptr<Deserializer> deser_;
   const String req_;
- protected:
+
+protected:
   // Invoked by the ASIO Framework after we have markAsFinished(); this is
   // where we return data to PHP.
-  void unserialize(TypedValue& result) override final {
+  void unserialize(TypedValue &result) override final {
     if (deser_) {
       SliceList slices;
       auto status = deser_->Slices(&slices);
@@ -136,7 +136,8 @@ struct ChannelData {
 const auto optMaxSend = HPHP::StaticString("max_send_message_size");
 const auto optMaxReceive = HPHP::StaticString("max_receive_message_size");
 const auto optLbPolicy = HPHP::StaticString("lb_policy_name");
-static void HHVM_METHOD(GrpcChannel, __construct, const String& name, const String& target, const Array& opt) {
+static void HHVM_METHOD(GrpcChannel, __construct, const String &name,
+                        const String &target, const Array &opt) {
   ChannelCreateParams p;
   if (opt.exists(optMaxSend)) {
     p.max_send_message_size_ = opt[optMaxSend].toInt64();
@@ -148,13 +149,14 @@ static void HHVM_METHOD(GrpcChannel, __construct, const String& name, const Stri
     p.lb_policy_name_ = opt[optLbPolicy].toString().toCppString();
   }
 
-  auto* d = Native::data<ChannelData>(this_);
+  auto *d = Native::data<ChannelData>(this_);
   d->channel_ = GetChannel(name.toCppString(), target.toCppString(), p);
 }
 
 const auto optTimeoutMicros = HPHP::StaticString("timeout_micros");
 const auto optMetadata = HPHP::StaticString("metadata");
-static Object HHVM_METHOD(GrpcChannel, UnaryCallInternal, const String& method, const String& req, const Array& opt) {
+static Object HHVM_METHOD(GrpcChannel, UnaryCallInternal, const String &method,
+                          const String &req, const Array &opt) {
   UnaryCallParams p;
   p.method_ = method.toCppString();
   if (opt.exists(optTimeoutMicros)) {
@@ -175,29 +177,25 @@ static Object HHVM_METHOD(GrpcChannel, UnaryCallInternal, const String& method, 
   }
 
   auto event = new GrpcEvent(req);
-  auto* d = Native::data<ChannelData>(this_);
+  auto *d = Native::data<ChannelData>(this_);
   event->data_->ctx_ = std::move(d->channel_->GrpcClientUnaryCall(p, event));
   return Object{event->getWaitHandle()};
 }
 
 static String HHVM_METHOD(GrpcChannel, Debug) {
-  auto* d = Native::data<ChannelData>(this_);
+  auto *d = Native::data<ChannelData>(this_);
   return d->channel_->Debug();
 }
 
-
 const StaticString s_ChannelData("ChannelData");
 struct GrpcExtension : Extension {
-  GrpcExtension(): Extension("grpc", "0.0.1") {
-    GrpcClientInit();
-  }
+  GrpcExtension() : Extension("grpc", "0.0.1") { GrpcClientInit(); }
 
   void moduleInit() override {
     HHVM_ME(GrpcChannel, __construct);
     HHVM_ME(GrpcChannel, UnaryCallInternal);
     HHVM_ME(GrpcChannel, Debug);
     Native::registerNativeDataInfo<ChannelData>(s_ChannelData.get());
-
 
     HHVM_ME(GrpcUnaryCallResult, StatusCode);
     HHVM_ME(GrpcUnaryCallResult, StatusMessage);

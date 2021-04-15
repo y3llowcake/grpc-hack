@@ -27,18 +27,32 @@
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
+using grpc::ServerWriter;
 using grpc::Status;
-using helloworld::HelloWorldService;
 using helloworld::HelloReply;
 using helloworld::HelloRequest;
+using helloworld::HelloWorldService;
 
 // Logic and data behind the server's behavior.
 class HelloWorldServiceImpl final : public HelloWorldService::Service {
-  Status SayHello(ServerContext* context, const HelloRequest* request,
-                  HelloReply* reply) override {
+  Status SayHello(ServerContext *context, const HelloRequest *request,
+                  HelloReply *reply) override {
     std::cout << "received request: '" << request->txt() << "'\n";
     std::cout << "context" << context << "\n";
     reply->set_txt("Hello! You said: " + request->txt());
+    return Status::OK;
+  }
+
+  Status SayHelloStream(ServerContext *context, const HelloRequest *request,
+                        ServerWriter<HelloReply> *writer) override {
+    std::cout << "received request: '" << request->txt() << "'\n";
+    std::cout << "context" << context << "\n";
+    for (int i = 0; i < 3; i++) {
+      HelloReply reply;
+      reply.set_txt("Hello! this is stream response " + std::to_string(i) +
+                    " you said: " + request->txt());
+      writer->Write(reply);
+    }
     return Status::OK;
   }
 };
@@ -62,8 +76,7 @@ void RunServer() {
   server->Wait();
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   RunServer();
-
   return 0;
 }

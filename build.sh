@@ -6,7 +6,9 @@ HHVM_SOURCE_ROOT=/home/cy/co/hhvm
 # hacky version of hphpize
 cp ${HHVM_SOURCE_ROOT}/hphp/tools/hphpize/hphpize.cmake CMakeLists.txt
 
-# bazel test //...
+# 
+# TODO: bazel test //...
+# 
 bazel build :grpc_client_static
 
 #
