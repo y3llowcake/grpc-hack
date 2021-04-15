@@ -102,7 +102,7 @@ protected:
   void unserialize(TypedValue &result) override final {
     if (deser_) {
       SliceList slices;
-      auto status = deser_->Slices(&slices);
+      auto status = deser_->ResponseSlices(&slices);
       if (!status.Ok()) {
         if (!data_->status_.Ok()) { // take first failure.
           data_->status_ = status;
@@ -155,7 +155,7 @@ static void HHVM_METHOD(GrpcChannel, __construct, const String &name,
 
 const auto optTimeoutMicros = HPHP::StaticString("timeout_micros");
 const auto optMetadata = HPHP::StaticString("metadata");
-static Object HHVM_METHOD(GrpcChannel, UnaryCallInternal, const String &method,
+static Object HHVM_METHOD(GrpcChannel, unaryCallInternal, const String &method,
                           const String &req, const Array &opt) {
   UnaryCallParams p;
   p.method_ = method.toCppString();
@@ -182,6 +182,12 @@ static Object HHVM_METHOD(GrpcChannel, UnaryCallInternal, const String &method,
   return Object{event->getWaitHandle()};
 }
 
+static void HHVM_METHOD(GrpcChannel, serverStreamingCallInternal,
+                        const String &method, const String &req) {
+  auto *d = Native::data<ChannelData>(this_);
+  d->channel_->ServerStreamingCall();
+}
+
 static String HHVM_METHOD(GrpcChannel, Debug) {
   auto *d = Native::data<ChannelData>(this_);
   return d->channel_->Debug();
@@ -193,7 +199,8 @@ struct GrpcExtension : Extension {
 
   void moduleInit() override {
     HHVM_ME(GrpcChannel, __construct);
-    HHVM_ME(GrpcChannel, UnaryCallInternal);
+    HHVM_ME(GrpcChannel, unaryCallInternal);
+    HHVM_ME(GrpcChannel, serverStreamingCallInternal);
     HHVM_ME(GrpcChannel, Debug);
     Native::registerNativeDataInfo<ChannelData>(s_ChannelData.get());
 
@@ -204,6 +211,7 @@ struct GrpcExtension : Extension {
     HHVM_ME(GrpcUnaryCallResult, Peer);
     Native::registerNativeDataInfo<GrpcUnaryCallResult>(
         GrpcUnaryCallResult::s_className.get());
+
     loadSystemlib();
   }
 } s_grpc_extension;

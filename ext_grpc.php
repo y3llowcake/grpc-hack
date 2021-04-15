@@ -51,7 +51,7 @@ class GrpcChannel {
   }
 
   <<__Native>>
-  private function UnaryCallInternal(
+  private function unaryCallInternal(
     string $method,
     string $request,
     darray $opt,
@@ -65,6 +65,16 @@ class GrpcChannel {
   ): Awaitable<GrpcUnaryCallResult> {
     return $this->UnaryCallInternal($method, $request, Shapes::toArray($opt));
   }
+
+  public function ServerStreamingCall(): void {
+    $this->serverStreamingCallInternal('', '');
+  }
+
+  <<__Native>>
+  public function serverStreamingCallInternal(
+    string $method,
+    string $request,
+  ): void;
 
   <<__Native>>
   function Debug(): string;

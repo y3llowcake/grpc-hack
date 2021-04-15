@@ -18,6 +18,8 @@ struct ChannelImpl : Channel {
   GrpcClientUnaryCall(const UnaryCallParams &p,
                       GrpcClientUnaryResultEvent *ev) override;
 
+  void ServerStreamingCall() override;
+
   grpc_core::Json DebugJson() {
     return grpc_channel_get_channelz_node(core_channel_)->RenderJson();
   }
@@ -122,8 +124,6 @@ struct ClientContextImpl : ClientContext {
   grpc::ClientContext ctx_;
 };
 
-// TODO: for sreq, what happens if the request is terminated before we start
-// copying the contents onto the wire? Do I need to copy early?
 std::shared_ptr<ClientContext>
 ChannelImpl::GrpcClientUnaryCall(const UnaryCallParams &p,
                                  GrpcClientUnaryResultEvent *ev) {
@@ -151,8 +151,23 @@ ChannelImpl::GrpcClientUnaryCall(const UnaryCallParams &p,
   return std::move(ctx);
 }
 
+
+
+void ChannelImpl::ServerStreamingCall() {
+  auto meth = grpc::internal::RpcMethod("/helloworld.HelloWorldService/SayHelloStream",
+                                        grpc::internal::RpcMethod::SERVER_STREAMING);
+  std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
+  grpc::ByteBuffer req;
+  grpc::ByteBuffer resp;
+  //reactor ClientReadReactor<groc::ByteBuffer>;
+  // ClientCallbackReaderFactory<grpc::ByteBuffer>::Create(channel_.get(), meth, &ctx->ctx_, &req, reactor);
+  // ClientCallbackReader
+  // ClientCallbackReaderImpl 
+  // ClientCallbackReaderFactory
+}
+
 struct DeserializerImpl : Deserializer {
-  Status Slices(SliceList *list) override {
+  Status ResponseSlices(SliceList *list) override {
     std::vector<grpc::Slice> slices;
     auto status = bb_.Dump(&slices);
     if (!status.ok()) {

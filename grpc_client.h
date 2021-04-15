@@ -6,6 +6,10 @@
 #include <unordered_map>
 #include <vector>
 
+//
+// Status
+//
+
 struct Status {
   int code_;
   std::string message_;
@@ -13,11 +17,21 @@ struct Status {
   bool Ok() const;
 };
 
-typedef std::vector<std::pair<const uint8_t *, size_t>> SliceList;
+//
+// SerDe
+//
 
+typedef std::vector<std::pair<const uint8_t *, size_t>> SliceList;
 struct Deserializer {
-  virtual Status Slices(SliceList *) = 0;
+  virtual Status ResponseSlices(SliceList *) = 0;
 };
+struct Serializer {
+  virtual void FillRequest(const void **, size_t *) const = 0;
+};
+
+//
+// Metadata and context
+//
 
 typedef std::unordered_map<std::string, std::vector<std::string>> Md;
 
@@ -25,6 +39,10 @@ struct ClientContext {
   virtual void Metadata(Md *) = 0;
   virtual std::string Peer() = 0;
 };
+
+//
+// Unary Calls.
+//
 
 struct GrpcClientUnaryResultEvent {
   // Invoked when the request content is being serialized to the wire.
@@ -44,6 +62,18 @@ struct UnaryCallParams {
   UnaryCallParams() : timeout_micros_(0){};
 };
 
+//
+// Channels
+//
+
+struct Channel {
+  virtual std::shared_ptr<ClientContext>
+  GrpcClientUnaryCall(const UnaryCallParams &,
+                      GrpcClientUnaryResultEvent *) = 0;
+  virtual void ServerStreamingCall() = 0;
+  virtual std::string Debug() = 0;
+};
+
 struct ChannelCreateParams {
   int max_send_message_size_;
   int max_receive_message_size_;
@@ -52,16 +82,13 @@ struct ChannelCreateParams {
       : max_send_message_size_(0), max_receive_message_size_(0){};
 };
 
-struct Channel {
-  virtual std::shared_ptr<ClientContext>
-  GrpcClientUnaryCall(const UnaryCallParams &,
-                      GrpcClientUnaryResultEvent *) = 0;
-  virtual std::string Debug() = 0;
-};
-
 std::shared_ptr<Channel> GetChannel(const std::string &name,
                                     const std::string &target,
                                     const ChannelCreateParams &params);
+
+//
+// Housekeeping.
+//
 
 void GrpcClientInit();
 

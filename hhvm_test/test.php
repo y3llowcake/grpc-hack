@@ -19,5 +19,6 @@ function main(): void {
   echo "response: '{$resp}'\n";
   echo "peer: '".$r->Peer()."'\n";
   echo $channel->Debug()."\n";
+  $channel->ServerStreamingCall('', '');
   echo "test fin\n";
 }
