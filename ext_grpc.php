@@ -27,9 +27,15 @@ namespace GrpcNative {
       );
     }
 
+    <<__Native>>
+    public static function Create(): ClientContext;
+
+    //<<__Native>>
+    //public function Peer(): string;
+
   }
 
-
+  <<__NativeData("GrpcUnaryCallResult")>>
   final class UnaryCallResult {
     private function __construct(): void {
       throw new InvalidOperationException(
@@ -42,18 +48,8 @@ namespace GrpcNative {
 
     <<__Native>>
     public function Response(): string;
-
-    <<__Native>>
-    public function Peer(): string;
-
-    // TODO, peer and metadata.
   }
 
-
-  type UnaryCallOpt = shape(
-    'timeout_micros' => ?int,
-    'metadata' => ?dict<string, vec<string>>,
-  );
   type ChannelCreateOpt = shape(
     'max_send_message_size' => ?int,
     'max_receive_message_size' => ?int,
@@ -75,20 +71,11 @@ namespace GrpcNative {
     }
 
     <<__Native>>
-    private function unaryCallInternal(
-      string $method,
-      string $request,
-      darray $opt,
-    ): Awaitable<UnaryCallResult>;
-
-
     public function UnaryCall(
+      ClientContext $ctx,
       string $method,
       string $request,
-      UnaryCallOpt $opt = shape(),
-    ): Awaitable<UnaryCallResult> {
-      return $this->unaryCallInternal($method, $request, Shapes::toArray($opt));
-    }
+    ): Awaitable<UnaryCallResult>;
 
     public function ServerStreamingCall(): void {
       $this->serverStreamingCallInternal('', '');

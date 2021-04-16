@@ -10,12 +10,50 @@
 
 #include <unordered_map>
 
+
+//
+// Status
+//
+
+Status FromGrpcStatus(const grpc::Status s) {
+  Status r;
+  r.code_ = s.error_code();
+  r.message_ = s.error_message();
+  r.details_ = s.error_details();
+  return r;
+}
+
+bool Status::Ok() const { return code_ == grpc::OK; }
+
+//
+// Context
+//
+
+struct ClientCtxImpl: ClientCtx {
+  std::string Peer() override {
+    return peer_;
+  }
+  static inline ClientCtxImpl* from(ClientCtx* c) {
+    return static_cast<ClientCtxImpl*>(c);
+  }
+  std::unique_ptr<grpc::ClientContext> ctx_;
+  std::string peer_;
+};
+
+std::shared_ptr<ClientCtx> ClientCtx::New() {
+  auto impl = new ClientCtxImpl;
+  impl->ctx_.reset(new grpc::ClientContext());
+  return std::shared_ptr<ClientCtx>(impl);
+}
+
+
 struct ChannelImpl : Channel {
   std::shared_ptr<grpc::Channel> channel_;
   grpc_channel *core_channel_; // not owned
 
-  std::shared_ptr<ClientContext>
-  GrpcClientUnaryCall(const UnaryCallParams &p,
+  void
+  GrpcClientUnaryCall(const std::string &method,
+      std::shared_ptr<ClientCtx> ctx,
                       GrpcClientUnaryResultEvent *ev) override;
 
   void ServerStreamingCall() override;
@@ -102,32 +140,11 @@ std::shared_ptr<Channel> GetChannel(const std::string &name,
   return ChannelStore::Singleton->Debug();
 }*/
 
-Status FromGrpcStatus(const grpc::Status s) {
-  Status r;
-  r.code_ = s.error_code();
-  r.message_ = s.error_message();
-  r.details_ = s.error_details();
-  return r;
-}
-
-bool Status::Ok() const { return code_ == grpc::OK; }
-
-struct ClientContextImpl : ClientContext {
-  void Metadata(Md *md) {
-    // TODO return server metadata here via
-    // GetServerInitialMetadata and GetServerTrailingMetadata
-  }
-
-  std::string Peer() override { return peer_; }
-
-  std::string peer_;
-  grpc::ClientContext ctx_;
-};
-
-std::shared_ptr<ClientContext>
-ChannelImpl::GrpcClientUnaryCall(const UnaryCallParams &p,
+void
+ChannelImpl::GrpcClientUnaryCall(const std::string& method,
+  std::shared_ptr<ClientCtx> ctx,
                                  GrpcClientUnaryResultEvent *ev) {
-  std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
+/*  std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
   if (p.timeout_micros_ > 0) {
     auto to =
         gpr_time_add(gpr_now(GPR_CLOCK_MONOTONIC),
@@ -138,17 +155,19 @@ ChannelImpl::GrpcClientUnaryCall(const UnaryCallParams &p,
     for (auto v : kv.second) {
       ctx->ctx_.AddMetadata(kv.first, v);
     }
-  }
-  auto meth = grpc::internal::RpcMethod(p.method_.c_str(),
+  }*/
+  
+  auto meth = grpc::internal::RpcMethod(method.c_str(),
                                         grpc::internal::RpcMethod::NORMAL_RPC);
   ::grpc::internal::CallbackUnaryCall<
       GrpcClientUnaryResultEvent, GrpcClientUnaryResultEvent,
       GrpcClientUnaryResultEvent, GrpcClientUnaryResultEvent>(
-      channel_.get(), meth, &ctx->ctx_, ev, ev, [ctx, ev](grpc::Status s) {
-        ctx->peer_ = ctx->ctx_.peer();
+      channel_.get(), meth, ClientCtxImpl::from(ctx.get())->ctx_.get(), ev, ev, [ctx, ev](grpc::Status s) {
+      auto ctxi = ClientCtxImpl::from(ctx.get());
+      ctxi->peer_ = ctxi->ctx_->peer();
         ev->Done(FromGrpcStatus(s));
       });
-  return std::move(ctx);
+  //return std::move(ctx);
 }
 
 
@@ -156,7 +175,7 @@ ChannelImpl::GrpcClientUnaryCall(const UnaryCallParams &p,
 void ChannelImpl::ServerStreamingCall() {
   auto meth = grpc::internal::RpcMethod("/helloworld.HelloWorldService/SayHelloStream",
                                         grpc::internal::RpcMethod::SERVER_STREAMING);
-  std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
+  //std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
   grpc::ByteBuffer req;
   grpc::ByteBuffer resp;
   //reactor ClientReadReactor<groc::ByteBuffer>;

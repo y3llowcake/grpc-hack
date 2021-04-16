@@ -49,21 +49,25 @@ NATIVE_DATA_METHOD(int, GrpcStatus, Code, d->data_.code_);
 NATIVE_DATA_METHOD(String, GrpcStatus, Message, d->data_.message_);
 NATIVE_DATA_METHOD(String, GrpcStatus, Details, d->data_.details_);
 
+NATIVE_DATA_CLASS(GrpcClientContext, GrpcNative\\ClientContext,
+                  std::shared_ptr<ClientCtx>, std::move(data));
+NATIVE_DATA_METHOD(String, GrpcClientContext, Peer, d->data_->Peer());
+Object HHVM_STATIC_METHOD(GrpcClientContext, Create) {
+  return GrpcClientContext::newInstance(
+      std::move(std::shared_ptr(ClientCtx::New())));
+}
+
 struct UnaryCallResultData {
   Status status_;
   String resp_;
-  String peer_;
-  std::shared_ptr<ClientContext> ctx_;
   UnaryCallResultData() : resp_("") {}
 };
 
 NATIVE_DATA_CLASS(GrpcUnaryCallResult, GrpcNative\\UnaryCallResult,
                   std::unique_ptr<UnaryCallResultData>, std::move(data));
-
 NATIVE_DATA_METHOD(Object, GrpcUnaryCallResult, Status,
                    GrpcStatus::newInstance(d->data_->status_));
 NATIVE_DATA_METHOD(String, GrpcUnaryCallResult, Response, d->data_->resp_);
-NATIVE_DATA_METHOD(String, GrpcUnaryCallResult, Peer, d->data_->ctx_->Peer());
 
 struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
 public:
@@ -146,32 +150,33 @@ static void HHVM_METHOD(GrpcChannel, __construct, const String &name,
   d->channel_ = GetChannel(name.toCppString(), target.toCppString(), p);
 }
 
-const auto optTimeoutMicros = HPHP::StaticString("timeout_micros");
-const auto optMetadata = HPHP::StaticString("metadata");
-static Object HHVM_METHOD(GrpcChannel, unaryCallInternal, const String &method,
-                          const String &req, const Array &opt) {
-  UnaryCallParams p;
-  p.method_ = method.toCppString();
-  if (opt.exists(optTimeoutMicros)) {
-    p.timeout_micros_ = opt[optTimeoutMicros].toInt64();
-  }
-
-  if (opt.exists(optMetadata)) {
-    auto metadata = opt[optMetadata].toDict();
-    for (auto it = metadata.begin(); !it.end(); it.next()) {
-      auto k = it.first().toString().toCppString();
-      if (p.md_.find(k) == p.md_.end()) {
-        p.md_[k] = std::vector<std::string>();
-      }
-      for (auto vit = it.second().toArray().begin(); !vit.end(); vit.next()) {
-        p.md_[k].push_back(vit.second().toString().toCppString());
-      }
+// const auto optTimeoutMicros = HPHP::StaticString("timeout_micros");
+// const auto optMetadata = HPHP::StaticString("metadata");
+static Object HHVM_METHOD(GrpcChannel, UnaryCall, const Object &ctx,
+                          const String &method, const String &req) {
+  /*  UnaryCallParams p;
+    p.method_ = method.toCppString();
+    if (opt.exists(optTimeoutMicros)) {
+      p.timeout_micros_ = opt[optTimeoutMicros].toInt64();
     }
-  }
+
+    if (opt.exists(optMetadata)) {
+      auto metadata = opt[optMetadata].toDict();
+      for (auto it = metadata.begin(); !it.end(); it.next()) {
+        auto k = it.first().toString().toCppString();
+        if (p.md_.find(k) == p.md_.end()) {
+          p.md_[k] = std::vector<std::string>();
+        }
+        for (auto vit = it.second().toArray().begin(); !vit.end(); vit.next()) {
+          p.md_[k].push_back(vit.second().toString().toCppString());
+        }
+      }
+    }*/
 
   auto event = new GrpcEvent(req);
   auto *d = Native::data<ChannelData>(this_);
-  event->data_->ctx_ = std::move(d->channel_->GrpcClientUnaryCall(p, event));
+  auto *dctx = Native::data<GrpcClientContext>(ctx);
+  d->channel_->GrpcClientUnaryCall(method.toCppString(), dctx->data_, event);
   return Object{event->getWaitHandle()};
 }
 
@@ -197,9 +202,13 @@ struct GrpcExtension : Extension {
     Native::registerNativeDataInfo<GrpcStatus>(
         GrpcStatus::s_cppClassName.get());
 
+    HHVM_STATIC_MALIAS(GrpcNative\\ClientContext, Create, GrpcClientContext,
+                       Create);
+    Native::registerNativeDataInfo<GrpcClientContext>(
+        GrpcClientContext::s_cppClassName.get());
+
     HHVM_MALIAS(GrpcNative\\Channel, __construct, GrpcChannel, __construct);
-    HHVM_MALIAS(GrpcNative\\Channel, unaryCallInternal, GrpcChannel,
-                unaryCallInternal);
+    HHVM_MALIAS(GrpcNative\\Channel, UnaryCall, GrpcChannel, UnaryCall);
     HHVM_MALIAS(GrpcNative\\Channel, serverStreamingCallInternal, GrpcChannel,
                 serverStreamingCallInternal);
     HHVM_MALIAS(GrpcNative\\Channel, Debug, GrpcChannel, Debug);
@@ -209,7 +218,8 @@ struct GrpcExtension : Extension {
                 Status);
     HHVM_MALIAS(GrpcNative\\UnaryCallResult, Response, GrpcUnaryCallResult,
                 Response);
-    HHVM_MALIAS(GrpcNative\\UnaryCallResult, Peer, GrpcUnaryCallResult, Peer);
+    Native::registerNativeDataInfo<GrpcUnaryCallResult>(
+        GrpcUnaryCallResult::s_cppClassName.get());
 
     loadSystemlib();
   }
