@@ -29,21 +29,21 @@ bool Status::Ok() const { return code_ == grpc::OK; }
 // Context
 //
 
-struct ClientCtxImpl: ClientCtx {
+struct ClientContextImpl: ClientContext {
   std::string Peer() override {
     return peer_;
   }
-  static inline ClientCtxImpl* from(ClientCtx* c) {
-    return static_cast<ClientCtxImpl*>(c);
+  static inline ClientContextImpl* from(ClientContext* c) {
+    return static_cast<ClientContextImpl*>(c);
   }
   std::unique_ptr<grpc::ClientContext> ctx_;
   std::string peer_;
 };
 
-std::shared_ptr<ClientCtx> ClientCtx::New() {
-  auto impl = new ClientCtxImpl;
+std::shared_ptr<ClientContext> ClientContext::New() {
+  auto impl = new ClientContextImpl;
   impl->ctx_.reset(new grpc::ClientContext());
-  return std::shared_ptr<ClientCtx>(impl);
+  return std::shared_ptr<ClientContext>(impl);
 }
 
 
@@ -53,7 +53,7 @@ struct ChannelImpl : Channel {
 
   void
   GrpcClientUnaryCall(const std::string &method,
-      std::shared_ptr<ClientCtx> ctx,
+      std::shared_ptr<ClientContext> ctx,
                       GrpcClientUnaryResultEvent *ev) override;
 
   void ServerStreamingCall() override;
@@ -142,7 +142,7 @@ std::shared_ptr<Channel> GetChannel(const std::string &name,
 
 void
 ChannelImpl::GrpcClientUnaryCall(const std::string& method,
-  std::shared_ptr<ClientCtx> ctx,
+  std::shared_ptr<ClientContext> ctx,
                                  GrpcClientUnaryResultEvent *ev) {
 /*  std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
   if (p.timeout_micros_ > 0) {
@@ -162,8 +162,8 @@ ChannelImpl::GrpcClientUnaryCall(const std::string& method,
   ::grpc::internal::CallbackUnaryCall<
       GrpcClientUnaryResultEvent, GrpcClientUnaryResultEvent,
       GrpcClientUnaryResultEvent, GrpcClientUnaryResultEvent>(
-      channel_.get(), meth, ClientCtxImpl::from(ctx.get())->ctx_.get(), ev, ev, [ctx, ev](grpc::Status s) {
-      auto ctxi = ClientCtxImpl::from(ctx.get());
+      channel_.get(), meth, ClientContextImpl::from(ctx.get())->ctx_.get(), ev, ev, [ctx, ev](grpc::Status s) {
+      auto ctxi = ClientContextImpl::from(ctx.get());
       ctxi->peer_ = ctxi->ctx_->peer();
         ev->Done(FromGrpcStatus(s));
       });

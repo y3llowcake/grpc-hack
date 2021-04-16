@@ -50,11 +50,11 @@ NATIVE_DATA_METHOD(String, GrpcStatus, Message, d->data_.message_);
 NATIVE_DATA_METHOD(String, GrpcStatus, Details, d->data_.details_);
 
 NATIVE_DATA_CLASS(GrpcClientContext, GrpcNative\\ClientContext,
-                  std::shared_ptr<ClientCtx>, std::move(data));
+                  std::shared_ptr<ClientContext>, std::move(data));
 NATIVE_DATA_METHOD(String, GrpcClientContext, Peer, d->data_->Peer());
 Object HHVM_STATIC_METHOD(GrpcClientContext, Create) {
   return GrpcClientContext::newInstance(
-      std::move(std::shared_ptr(ClientCtx::New())));
+      std::move(std::shared_ptr(ClientContext::New())));
 }
 
 struct UnaryCallResultData {

@@ -35,8 +35,8 @@ struct Serializer {
 
 typedef std::unordered_map<std::string, std::vector<std::string>> Md;
 
-struct ClientCtx {
-  static std::shared_ptr<ClientCtx> New();
+struct ClientContext {
+  static std::shared_ptr<ClientContext> New();
   virtual std::string Peer() = 0;
 };
 
@@ -61,7 +61,7 @@ struct GrpcClientUnaryResultEvent {
 
 struct Channel {
   virtual void GrpcClientUnaryCall(const std::string &method,
-                                   std::shared_ptr<ClientCtx> ctx,
+                                   std::shared_ptr<ClientContext> ctx,
                                    GrpcClientUnaryResultEvent *) = 0;
   virtual void ServerStreamingCall() = 0;
   virtual std::string Debug() = 0;
