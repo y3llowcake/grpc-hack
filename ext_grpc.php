@@ -49,25 +49,26 @@ namespace GrpcNative {
     public function Response(): string;
   }
 
-  type ChannelCreateOpt = shape(
-    'max_send_message_size' => ?int,
-    'max_receive_message_size' => ?int,
-    'lb_policy_name' => ?string,
-  );
+  /*  type ChannelCreateOpt = shape(
+      'max_send_message_size' => ?int,
+      'max_receive_message_size' => ?int,
+      'lb_policy_name' => ?string,
+  );*/
 
-  <<__NativeData("ChannelData")>>
+  <<__NativeData("GrpcChannel")>>
   class Channel {
-    <<__Native>>
-    private function __construct(string $name, string $target, darray $opt);
+    private function __construct(): void {
+      throw new InvalidOperationException(
+        __CLASS__." objects cannot be directly created",
+      );
+    }
 
-    <<__Memoize>>
+    <<__Native>>
     public static function Create(
       string $name,
       string $target,
-      ChannelCreateOpt $opt = shape(),
-    ): Channel {
-      return new Channel($name, $target, Shapes::toArray($opt));
-    }
+      darray $opt,
+    ): Channel;
 
     <<__Native>>
     public function UnaryCall(

@@ -126,15 +126,15 @@ protected:
   }
 };
 
-struct ChannelData {
-  std::shared_ptr<Channel> channel_;
-};
+NATIVE_DATA_CLASS(GrpcChannel, GrpcNative\\Channel, std::shared_ptr<Channel>,
+                  std::move(data));
+NATIVE_DATA_METHOD(String, GrpcChannel, Debug, d->data_->Debug());
 
 const auto optMaxSend = HPHP::StaticString("max_send_message_size");
 const auto optMaxReceive = HPHP::StaticString("max_receive_message_size");
 const auto optLbPolicy = HPHP::StaticString("lb_policy_name");
-static void HHVM_METHOD(GrpcChannel, __construct, const String &name,
-                        const String &target, const Array &opt) {
+Object HHVM_STATIC_METHOD(GrpcChannel, Create, const String &name,
+                          const String &target, const Array &opt) {
   ChannelCreateParams p;
   if (opt.exists(optMaxSend)) {
     p.max_send_message_size_ = opt[optMaxSend].toInt64();
@@ -146,8 +146,8 @@ static void HHVM_METHOD(GrpcChannel, __construct, const String &name,
     p.lb_policy_name_ = opt[optLbPolicy].toString().toCppString();
   }
 
-  auto *d = Native::data<ChannelData>(this_);
-  d->channel_ = GetChannel(name.toCppString(), target.toCppString(), p);
+  return GrpcChannel::newInstance(
+      std::move(GetChannel(name.toCppString(), target.toCppString(), p)));
 }
 
 // const auto optTimeoutMicros = HPHP::StaticString("timeout_micros");
@@ -174,21 +174,16 @@ static Object HHVM_METHOD(GrpcChannel, UnaryCall, const Object &ctx,
     }*/
 
   auto event = new GrpcEvent(req);
-  auto *d = Native::data<ChannelData>(this_);
+  auto *d = Native::data<GrpcChannel>(this_);
   auto *dctx = Native::data<GrpcClientContext>(ctx);
-  d->channel_->GrpcClientUnaryCall(method.toCppString(), dctx->data_, event);
+  d->data_->GrpcClientUnaryCall(method.toCppString(), dctx->data_, event);
   return Object{event->getWaitHandle()};
 }
 
 static void HHVM_METHOD(GrpcChannel, serverStreamingCallInternal,
                         const String &method, const String &req) {
-  auto *d = Native::data<ChannelData>(this_);
-  d->channel_->ServerStreamingCall();
-}
-
-static String HHVM_METHOD(GrpcChannel, Debug) {
-  auto *d = Native::data<ChannelData>(this_);
-  return d->channel_->Debug();
+  auto *d = Native::data<GrpcChannel>(this_);
+  d->data_->ServerStreamingCall();
 }
 
 const StaticString s_ChannelData("ChannelData");
@@ -196,25 +191,30 @@ struct GrpcExtension : Extension {
   GrpcExtension() : Extension("grpc", "0.0.1") { GrpcClientInit(); }
 
   void moduleInit() override {
+    // Status
     HHVM_MALIAS(GrpcNative\\Status, Code, GrpcStatus, Code);
     HHVM_MALIAS(GrpcNative\\Status, Message, GrpcStatus, Message);
     HHVM_MALIAS(GrpcNative\\Status, Details, GrpcStatus, Details);
     Native::registerNativeDataInfo<GrpcStatus>(
         GrpcStatus::s_cppClassName.get());
 
+    // ClientContext
     HHVM_STATIC_MALIAS(GrpcNative\\ClientContext, Create, GrpcClientContext,
                        Create);
     HHVM_MALIAS(GrpcNative\\ClientContext, Peer, GrpcClientContext, Peer);
     Native::registerNativeDataInfo<GrpcClientContext>(
         GrpcClientContext::s_cppClassName.get());
 
-    HHVM_MALIAS(GrpcNative\\Channel, __construct, GrpcChannel, __construct);
+    // Channel
+    HHVM_STATIC_MALIAS(GrpcNative\\Channel, Create, GrpcChannel, Create);
     HHVM_MALIAS(GrpcNative\\Channel, UnaryCall, GrpcChannel, UnaryCall);
     HHVM_MALIAS(GrpcNative\\Channel, serverStreamingCallInternal, GrpcChannel,
                 serverStreamingCallInternal);
     HHVM_MALIAS(GrpcNative\\Channel, Debug, GrpcChannel, Debug);
-    Native::registerNativeDataInfo<ChannelData>(s_ChannelData.get());
+    Native::registerNativeDataInfo<GrpcChannel>(
+        GrpcChannel::s_cppClassName.get());
 
+    // UnaryCallResult
     HHVM_MALIAS(GrpcNative\\UnaryCallResult, Status, GrpcUnaryCallResult,
                 Status);
     HHVM_MALIAS(GrpcNative\\UnaryCallResult, Response, GrpcUnaryCallResult,
