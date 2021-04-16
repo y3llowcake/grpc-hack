@@ -3,7 +3,7 @@
 <<__EntryPoint>>
 function main(): void {
   echo "test start\n";
-  $channel = GrpcChannel::Create(
+  $channel = Grpc\Channel::Create(
     'foo',
     'localhost:50051',
     shape('lb_policy_name' => 'round_robin'),
