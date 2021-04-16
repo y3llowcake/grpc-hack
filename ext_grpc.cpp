@@ -204,6 +204,7 @@ struct GrpcExtension : Extension {
 
     HHVM_STATIC_MALIAS(GrpcNative\\ClientContext, Create, GrpcClientContext,
                        Create);
+    HHVM_MALIAS(GrpcNative\\ClientContext, Peer, GrpcClientContext, Peer);
     Native::registerNativeDataInfo<GrpcClientContext>(
         GrpcClientContext::s_cppClassName.get());
 

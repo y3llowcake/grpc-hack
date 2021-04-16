@@ -30,9 +30,8 @@ namespace GrpcNative {
     <<__Native>>
     public static function Create(): ClientContext;
 
-    //<<__Native>>
-    //public function Peer(): string;
-
+    <<__Native>>
+    public function Peer(): string;
   }
 
   <<__NativeData("GrpcUnaryCallResult")>>

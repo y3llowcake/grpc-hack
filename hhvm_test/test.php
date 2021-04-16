@@ -18,7 +18,7 @@ function main(): void {
   $resp = $r->Response();
   echo "response length: ".strlen($resp)."\n";
   echo "response: '{$resp}'\n";
-  // echo "peer: '".$r->Peer()."'\n";
+  echo "peer: '".$ctx->Peer()."'\n";
   echo $channel->Debug()."\n";
   $channel->ServerStreamingCall('', '');
   echo "test fin\n";
