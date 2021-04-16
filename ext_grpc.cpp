@@ -14,10 +14,11 @@ namespace HPHP {
 #define NATIVE_DATA_CLASS(cls, hackcls, ptr, assign)                           \
   struct cls {                                                                 \
     static Class *s_class;                                                     \
-    static const StaticString s_className;                                     \
+    static const StaticString s_hackClassName;                                 \
+    static const StaticString s_cppClassName;                                  \
     static Class *getClass() {                                                 \
       if (s_class == nullptr) {                                                \
-        s_class = Class::lookup(s_className.get());                            \
+        s_class = Class::lookup(s_hackClassName.get());                        \
         assertx(s_class);                                                      \
       }                                                                        \
       return s_class;                                                          \
@@ -34,13 +35,19 @@ namespace HPHP {
     cls &operator=(const cls &) = delete;                                      \
   };                                                                           \
   Class *cls::s_class = nullptr;                                               \
-  const StaticString cls::s_className(#hackcls);
+  const StaticString cls::s_hackClassName(#hackcls);                           \
+  const StaticString cls::s_cppClassName(#cls);
 
 #define NATIVE_DATA_METHOD(rettype, cls, meth, retexpr)                        \
   static rettype HHVM_METHOD(cls, meth) {                                      \
     auto *d = Native::data<cls>(this_);                                        \
     return retexpr;                                                            \
   }
+
+NATIVE_DATA_CLASS(GrpcStatus, Grpc\\Status, Status, data);
+NATIVE_DATA_METHOD(int, GrpcStatus, Code, d->data_.code_);
+NATIVE_DATA_METHOD(String, GrpcStatus, Message, d->data_.message_);
+NATIVE_DATA_METHOD(String, GrpcStatus, Details, d->data_.details_);
 
 struct UnaryCallResultData {
   Status status_;
@@ -53,12 +60,8 @@ struct UnaryCallResultData {
 NATIVE_DATA_CLASS(GrpcUnaryCallResult, Grpc\\UnaryCallResult,
                   std::unique_ptr<UnaryCallResultData>, std::move(data));
 
-NATIVE_DATA_METHOD(int, GrpcUnaryCallResult, StatusCode,
-                   d->data_->status_.code_);
-NATIVE_DATA_METHOD(String, GrpcUnaryCallResult, StatusMessage,
-                   d->data_->status_.message_);
-NATIVE_DATA_METHOD(String, GrpcUnaryCallResult, StatusDetails,
-                   d->data_->status_.details_);
+NATIVE_DATA_METHOD(Object, GrpcUnaryCallResult, Status,
+                   GrpcStatus::newInstance(d->data_->status_));
 NATIVE_DATA_METHOD(String, GrpcUnaryCallResult, Response, d->data_->resp_);
 NATIVE_DATA_METHOD(String, GrpcUnaryCallResult, Peer, d->data_->ctx_->Peer());
 
@@ -188,6 +191,12 @@ struct GrpcExtension : Extension {
   GrpcExtension() : Extension("grpc", "0.0.1") { GrpcClientInit(); }
 
   void moduleInit() override {
+    HHVM_MALIAS(Grpc\\Status, Code, GrpcStatus, Code);
+    HHVM_MALIAS(Grpc\\Status, Message, GrpcStatus, Message);
+    HHVM_MALIAS(Grpc\\Status, Details, GrpcStatus, Details);
+    Native::registerNativeDataInfo<GrpcStatus>(
+        GrpcStatus::s_cppClassName.get());
+
     HHVM_MALIAS(Grpc\\Channel, __construct, GrpcChannel, __construct);
     HHVM_MALIAS(Grpc\\Channel, unaryCallInternal, GrpcChannel,
                 unaryCallInternal);
@@ -196,12 +205,7 @@ struct GrpcExtension : Extension {
     HHVM_MALIAS(Grpc\\Channel, Debug, GrpcChannel, Debug);
     Native::registerNativeDataInfo<ChannelData>(s_ChannelData.get());
 
-    HHVM_MALIAS(Grpc\\UnaryCallResult, StatusCode, GrpcUnaryCallResult,
-                StatusCode);
-    HHVM_MALIAS(Grpc\\UnaryCallResult, StatusMessage, GrpcUnaryCallResult,
-                StatusMessage);
-    HHVM_MALIAS(Grpc\\UnaryCallResult, StatusDetails, GrpcUnaryCallResult,
-                StatusDetails);
+    HHVM_MALIAS(Grpc\\UnaryCallResult, Status, GrpcUnaryCallResult, Status);
     HHVM_MALIAS(Grpc\\UnaryCallResult, Response, GrpcUnaryCallResult, Response);
     HHVM_MALIAS(Grpc\\UnaryCallResult, Peer, GrpcUnaryCallResult, Peer);
 

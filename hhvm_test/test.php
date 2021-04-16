@@ -12,8 +12,8 @@ function main(): void {
     $channel->UnaryCall('/helloworld.HelloWorldService/SayHello', ''),
   );
   //$r = HH\Asio\join(grpc_unary_call('hello world'));
-  echo "code: {$r->StatusCode()}\n";
-  echo "message: '{$r->StatusMessage()}'\n";
+  echo "code: {$r->Status()->Code()}\n";
+  echo "message: '{$r->Status()->Message()}'\n";
   $resp = $r->Response();
   echo "response length: ".strlen($resp)."\n";
   echo "response: '{$resp}'\n";

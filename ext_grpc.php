@@ -1,6 +1,25 @@
 <?hh
 
 namespace Grpc {
+  <<__NativeData("GrpcStatus")>>
+  final class Status {
+    private function __construct(): void {
+      throw new InvalidOperationException(
+        __CLASS__." objects cannot be directly created",
+      );
+    }
+
+    <<__Native>>
+    public function Code(): int;
+
+    <<__Native>>
+    public function Message(): string;
+
+    <<__Native>>
+    public function Details(): string;
+  }
+
+
   final class UnaryCallResult {
     private function __construct(): void {
       throw new InvalidOperationException(
@@ -9,13 +28,7 @@ namespace Grpc {
     }
 
     <<__Native>>
-    public function StatusCode(): int;
-
-    <<__Native>>
-    public function StatusMessage(): string;
-
-    <<__Native>>
-    public function StatusDetails(): string;
+    public function Status(): Status;
 
     <<__Native>>
     public function Response(): string;
