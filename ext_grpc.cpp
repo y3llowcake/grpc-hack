@@ -11,7 +11,7 @@
 
 namespace HPHP {
 
-#define NATIVE_DATA_CLASS(cls, ptr)                                            \
+#define NATIVE_DATA_CLASS(cls, ptr, assign)                                    \
   struct cls {                                                                 \
     static Class *s_class;                                                     \
     static const StaticString s_className;                                     \
@@ -25,7 +25,7 @@ namespace HPHP {
     static Object newInstance(ptr data) {                                      \
       Object obj{getClass()};                                                  \
       auto *d = Native::data<cls>(obj);                                        \
-      d->data_ = std::move(data);                                              \
+      d->data_ = assign;                                                       \
       return obj;                                                              \
     }                                                                          \
     cls(){};                                                                   \
@@ -36,6 +36,12 @@ namespace HPHP {
   Class *cls::s_class = nullptr;                                               \
   const StaticString cls::s_className(#cls);
 
+#define NATIVE_DATA_METHOD(rettype, cls, meth, retexpr)                        \
+  static rettype HHVM_METHOD(cls, meth) {                                      \
+    auto *d = Native::data<cls>(this_);                                     \
+    return retexpr;                                                            \
+  }
+
 struct UnaryCallResultData {
   Status status_;
   String resp_;
@@ -44,32 +50,16 @@ struct UnaryCallResultData {
   UnaryCallResultData() : resp_("") {}
 };
 
-NATIVE_DATA_CLASS(GrpcUnaryCallResult, std::unique_ptr<UnaryCallResultData>);
+NATIVE_DATA_CLASS(GrpcUnaryCallResult, std::unique_ptr<UnaryCallResultData>,
+                  std::move(data));
 
-static int HHVM_METHOD(GrpcUnaryCallResult, StatusCode) {
-  auto *d = Native::data<GrpcUnaryCallResult>(this_);
-  return d->data_->status_.code_;
-}
-
-static String HHVM_METHOD(GrpcUnaryCallResult, StatusMessage) {
-  auto *d = Native::data<GrpcUnaryCallResult>(this_);
-  return d->data_->status_.message_;
-}
-
-static String HHVM_METHOD(GrpcUnaryCallResult, StatusDetails) {
-  auto *d = Native::data<GrpcUnaryCallResult>(this_);
-  return d->data_->status_.details_;
-}
-
-static String HHVM_METHOD(GrpcUnaryCallResult, Response) {
-  auto *d = Native::data<GrpcUnaryCallResult>(this_);
-  return String(d->data_->resp_);
-}
-
-static String HHVM_METHOD(GrpcUnaryCallResult, Peer) {
-  auto *d = Native::data<GrpcUnaryCallResult>(this_);
-  return String(d->data_->ctx_->Peer());
-}
+NATIVE_DATA_METHOD(int, GrpcUnaryCallResult, StatusCode, d->data_->status_.code_);
+NATIVE_DATA_METHOD(String, GrpcUnaryCallResult, StatusMessage,
+                   d->data_->status_.message_);
+NATIVE_DATA_METHOD(String, GrpcUnaryCallResult, StatusDetails,
+                   d->data_->status_.details_);
+NATIVE_DATA_METHOD(String, GrpcUnaryCallResult, Response, d->data_->resp_);
+NATIVE_DATA_METHOD(String, GrpcUnaryCallResult, Peer, d->data_->ctx_->Peer());
 
 struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
 public:
