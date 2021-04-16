@@ -32,6 +32,8 @@ namespace GrpcNative {
 
     <<__Native>>
     public function Peer(): string;
+    <<__Native>>
+    public function SetTimeoutMicros(int $to): void;
   }
 
   <<__NativeData("GrpcUnaryCallResult")>>

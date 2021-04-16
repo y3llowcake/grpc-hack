@@ -37,6 +37,8 @@ typedef std::unordered_map<std::string, std::vector<std::string>> Md;
 
 struct ClientContext {
   static std::shared_ptr<ClientContext> New();
+  virtual void SetTimeoutMicros(int to) = 0;
+  virtual void AddMetadata(const std::string &k, const std::string &v) = 0;
   virtual std::string Peer() = 0;
 };
 

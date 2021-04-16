@@ -33,6 +33,17 @@ struct ClientContextImpl: ClientContext {
   std::string Peer() override {
     return peer_;
   }
+  void SetTimeoutMicros(int to) override {
+    if (to > 0) {
+      auto gprto =
+          gpr_time_add(gpr_now(GPR_CLOCK_MONOTONIC),
+                     gpr_time_from_micros(to, GPR_TIMESPAN));
+      ctx_->set_deadline(gprto);
+    }
+  }
+  void AddMetadata(const std::string& k, const std::string& v) override {
+    ctx_->AddMetadata(k, v);
+  }
   static inline ClientContextImpl* from(ClientContext* c) {
     return static_cast<ClientContextImpl*>(c);
   }
@@ -145,12 +156,6 @@ ChannelImpl::GrpcClientUnaryCall(const std::string& method,
   std::shared_ptr<ClientContext> ctx,
                                  GrpcClientUnaryResultEvent *ev) {
 /*  std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
-  if (p.timeout_micros_ > 0) {
-    auto to =
-        gpr_time_add(gpr_now(GPR_CLOCK_MONOTONIC),
-                     gpr_time_from_micros(p.timeout_micros_, GPR_TIMESPAN));
-    ctx->ctx_.set_deadline(to);
-  }
   for (auto kv : p.md_) {
     for (auto v : kv.second) {
       ctx->ctx_.AddMetadata(kv.first, v);

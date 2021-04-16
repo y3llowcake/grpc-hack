@@ -38,25 +38,43 @@ namespace HPHP {
   const StaticString cls::s_hackClassName(#hackcls);                           \
   const StaticString cls::s_cppClassName(#cls);
 
-#define NATIVE_DATA_METHOD(rettype, cls, meth, retexpr)                        \
+#define NATIVE_GET_METHOD(rettype, cls, meth, expr)                            \
   static rettype HHVM_METHOD(cls, meth) {                                      \
     auto *d = Native::data<cls>(this_);                                        \
-    return retexpr;                                                            \
+    return expr;                                                               \
   }
 
-NATIVE_DATA_CLASS(GrpcStatus, GrpcNative\\Status, Status, data);
-NATIVE_DATA_METHOD(int, GrpcStatus, Code, d->data_.code_);
-NATIVE_DATA_METHOD(String, GrpcStatus, Message, d->data_.message_);
-NATIVE_DATA_METHOD(String, GrpcStatus, Details, d->data_.details_);
+#define NATIVE_SET_METHOD(cls, meth, expr, ...)                                \
+  static void HHVM_METHOD(cls, meth, __VA_ARGS__) {                            \
+    auto *d = Native::data<cls>(this_);                                        \
+    expr;                                                                      \
+  }
 
+//
+// Status
+//
+NATIVE_DATA_CLASS(GrpcStatus, GrpcNative\\Status, Status, data);
+NATIVE_GET_METHOD(int, GrpcStatus, Code, d->data_.code_);
+NATIVE_GET_METHOD(String, GrpcStatus, Message, d->data_.message_);
+NATIVE_GET_METHOD(String, GrpcStatus, Details, d->data_.details_);
+
+// ClientContext
 NATIVE_DATA_CLASS(GrpcClientContext, GrpcNative\\ClientContext,
                   std::shared_ptr<ClientContext>, std::move(data));
-NATIVE_DATA_METHOD(String, GrpcClientContext, Peer, d->data_->Peer());
 Object HHVM_STATIC_METHOD(GrpcClientContext, Create) {
   return GrpcClientContext::newInstance(
       std::move(std::shared_ptr(ClientContext::New())));
 }
+NATIVE_GET_METHOD(String, GrpcClientContext, Peer, d->data_->Peer());
+NATIVE_SET_METHOD(GrpcClientContext, SetTimeoutMicros,
+                  d->data_->SetTimeoutMicros(p), int p);
+NATIVE_SET_METHOD(GrpcClientContext, AddMetadata,
+                  d->data_->AddMetadata(k.toCppString(), v.toCppString()),
+                  const String &k, const String &v);
 
+//
+// UnaryCallResult
+//
 struct UnaryCallResultData {
   Status status_;
   String resp_;
@@ -65,9 +83,35 @@ struct UnaryCallResultData {
 
 NATIVE_DATA_CLASS(GrpcUnaryCallResult, GrpcNative\\UnaryCallResult,
                   std::unique_ptr<UnaryCallResultData>, std::move(data));
-NATIVE_DATA_METHOD(Object, GrpcUnaryCallResult, Status,
-                   GrpcStatus::newInstance(d->data_->status_));
-NATIVE_DATA_METHOD(String, GrpcUnaryCallResult, Response, d->data_->resp_);
+NATIVE_GET_METHOD(Object, GrpcUnaryCallResult, Status,
+                  GrpcStatus::newInstance(d->data_->status_));
+NATIVE_GET_METHOD(String, GrpcUnaryCallResult, Response, d->data_->resp_);
+
+//
+// Channel
+//
+NATIVE_DATA_CLASS(GrpcChannel, GrpcNative\\Channel, std::shared_ptr<Channel>,
+                  std::move(data));
+const auto optMaxSend = HPHP::StaticString("max_send_message_size");
+const auto optMaxReceive = HPHP::StaticString("max_receive_message_size");
+const auto optLbPolicy = HPHP::StaticString("lb_policy_name");
+Object HHVM_STATIC_METHOD(GrpcChannel, Create, const String &name,
+                          const String &target, const Array &opt) {
+  ChannelCreateParams p;
+  if (opt.exists(optMaxSend)) {
+    p.max_send_message_size_ = opt[optMaxSend].toInt64();
+  }
+  if (opt.exists(optMaxReceive)) {
+    p.max_receive_message_size_ = opt[optMaxReceive].toInt64();
+  }
+  if (opt.exists(optLbPolicy)) {
+    p.lb_policy_name_ = opt[optLbPolicy].toString().toCppString();
+  }
+
+  return GrpcChannel::newInstance(
+      std::move(GetChannel(name.toCppString(), target.toCppString(), p)));
+}
+NATIVE_GET_METHOD(String, GrpcChannel, Debug, d->data_->Debug());
 
 struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
 public:
@@ -126,30 +170,6 @@ protected:
   }
 };
 
-NATIVE_DATA_CLASS(GrpcChannel, GrpcNative\\Channel, std::shared_ptr<Channel>,
-                  std::move(data));
-NATIVE_DATA_METHOD(String, GrpcChannel, Debug, d->data_->Debug());
-
-const auto optMaxSend = HPHP::StaticString("max_send_message_size");
-const auto optMaxReceive = HPHP::StaticString("max_receive_message_size");
-const auto optLbPolicy = HPHP::StaticString("lb_policy_name");
-Object HHVM_STATIC_METHOD(GrpcChannel, Create, const String &name,
-                          const String &target, const Array &opt) {
-  ChannelCreateParams p;
-  if (opt.exists(optMaxSend)) {
-    p.max_send_message_size_ = opt[optMaxSend].toInt64();
-  }
-  if (opt.exists(optMaxReceive)) {
-    p.max_receive_message_size_ = opt[optMaxReceive].toInt64();
-  }
-  if (opt.exists(optLbPolicy)) {
-    p.lb_policy_name_ = opt[optLbPolicy].toString().toCppString();
-  }
-
-  return GrpcChannel::newInstance(
-      std::move(GetChannel(name.toCppString(), target.toCppString(), p)));
-}
-
 // const auto optTimeoutMicros = HPHP::StaticString("timeout_micros");
 // const auto optMetadata = HPHP::StaticString("metadata");
 static Object HHVM_METHOD(GrpcChannel, UnaryCall, const Object &ctx,
@@ -202,6 +222,10 @@ struct GrpcExtension : Extension {
     HHVM_STATIC_MALIAS(GrpcNative\\ClientContext, Create, GrpcClientContext,
                        Create);
     HHVM_MALIAS(GrpcNative\\ClientContext, Peer, GrpcClientContext, Peer);
+    HHVM_MALIAS(GrpcNative\\ClientContext, SetTimeoutMicros, GrpcClientContext,
+                SetTimeoutMicros);
+    HHVM_MALIAS(GrpcNative\\ClientContext, AddMetadata, GrpcClientContext,
+                AddMetadata);
     Native::registerNativeDataInfo<GrpcClientContext>(
         GrpcClientContext::s_cppClassName.get());
 
