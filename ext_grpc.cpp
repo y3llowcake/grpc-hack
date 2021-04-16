@@ -204,8 +204,6 @@ struct GrpcExtension : Extension {
                 StatusDetails);
     HHVM_MALIAS(Grpc\\UnaryCallResult, Response, GrpcUnaryCallResult, Response);
     HHVM_MALIAS(Grpc\\UnaryCallResult, Peer, GrpcUnaryCallResult, Peer);
-    Native::registerNativeDataInfo<GrpcUnaryCallResult>(
-        GrpcUnaryCallResult::s_className.get());
 
     loadSystemlib();
   }

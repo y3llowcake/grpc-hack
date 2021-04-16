@@ -1,7 +1,6 @@
 <?hh
 
 namespace Grpc {
-  <<__NativeData("Grpc\UnaryCallResultData")>>
   final class UnaryCallResult {
     private function __construct(): void {
       throw new InvalidOperationException(
