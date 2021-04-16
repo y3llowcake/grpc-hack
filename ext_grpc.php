@@ -1,6 +1,6 @@
 <?hh
 
-namespace Grpc {
+namespace GrpcNative {
   <<__NativeData("GrpcStatus")>>
   final class Status {
     private function __construct(): void {
@@ -17,6 +17,16 @@ namespace Grpc {
 
     <<__Native>>
     public function Details(): string;
+  }
+
+  <<__NativeData("GrpcClientContext")>>
+  final class ClientContext {
+    private function __construct(): void {
+      throw new InvalidOperationException(
+        __CLASS__." objects cannot be directly created",
+      );
+    }
+
   }
 
 
@@ -93,5 +103,4 @@ namespace Grpc {
     <<__Native>>
     function Debug(): string;
   }
-
 }

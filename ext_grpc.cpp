@@ -44,7 +44,7 @@ namespace HPHP {
     return retexpr;                                                            \
   }
 
-NATIVE_DATA_CLASS(GrpcStatus, Grpc\\Status, Status, data);
+NATIVE_DATA_CLASS(GrpcStatus, GrpcNative\\Status, Status, data);
 NATIVE_DATA_METHOD(int, GrpcStatus, Code, d->data_.code_);
 NATIVE_DATA_METHOD(String, GrpcStatus, Message, d->data_.message_);
 NATIVE_DATA_METHOD(String, GrpcStatus, Details, d->data_.details_);
@@ -57,7 +57,7 @@ struct UnaryCallResultData {
   UnaryCallResultData() : resp_("") {}
 };
 
-NATIVE_DATA_CLASS(GrpcUnaryCallResult, Grpc\\UnaryCallResult,
+NATIVE_DATA_CLASS(GrpcUnaryCallResult, GrpcNative\\UnaryCallResult,
                   std::unique_ptr<UnaryCallResultData>, std::move(data));
 
 NATIVE_DATA_METHOD(Object, GrpcUnaryCallResult, Status,
@@ -191,23 +191,25 @@ struct GrpcExtension : Extension {
   GrpcExtension() : Extension("grpc", "0.0.1") { GrpcClientInit(); }
 
   void moduleInit() override {
-    HHVM_MALIAS(Grpc\\Status, Code, GrpcStatus, Code);
-    HHVM_MALIAS(Grpc\\Status, Message, GrpcStatus, Message);
-    HHVM_MALIAS(Grpc\\Status, Details, GrpcStatus, Details);
+    HHVM_MALIAS(GrpcNative\\Status, Code, GrpcStatus, Code);
+    HHVM_MALIAS(GrpcNative\\Status, Message, GrpcStatus, Message);
+    HHVM_MALIAS(GrpcNative\\Status, Details, GrpcStatus, Details);
     Native::registerNativeDataInfo<GrpcStatus>(
         GrpcStatus::s_cppClassName.get());
 
-    HHVM_MALIAS(Grpc\\Channel, __construct, GrpcChannel, __construct);
-    HHVM_MALIAS(Grpc\\Channel, unaryCallInternal, GrpcChannel,
+    HHVM_MALIAS(GrpcNative\\Channel, __construct, GrpcChannel, __construct);
+    HHVM_MALIAS(GrpcNative\\Channel, unaryCallInternal, GrpcChannel,
                 unaryCallInternal);
-    HHVM_MALIAS(Grpc\\Channel, serverStreamingCallInternal, GrpcChannel,
+    HHVM_MALIAS(GrpcNative\\Channel, serverStreamingCallInternal, GrpcChannel,
                 serverStreamingCallInternal);
-    HHVM_MALIAS(Grpc\\Channel, Debug, GrpcChannel, Debug);
+    HHVM_MALIAS(GrpcNative\\Channel, Debug, GrpcChannel, Debug);
     Native::registerNativeDataInfo<ChannelData>(s_ChannelData.get());
 
-    HHVM_MALIAS(Grpc\\UnaryCallResult, Status, GrpcUnaryCallResult, Status);
-    HHVM_MALIAS(Grpc\\UnaryCallResult, Response, GrpcUnaryCallResult, Response);
-    HHVM_MALIAS(Grpc\\UnaryCallResult, Peer, GrpcUnaryCallResult, Peer);
+    HHVM_MALIAS(GrpcNative\\UnaryCallResult, Status, GrpcUnaryCallResult,
+                Status);
+    HHVM_MALIAS(GrpcNative\\UnaryCallResult, Response, GrpcUnaryCallResult,
+                Response);
+    HHVM_MALIAS(GrpcNative\\UnaryCallResult, Peer, GrpcUnaryCallResult, Peer);
 
     loadSystemlib();
   }
