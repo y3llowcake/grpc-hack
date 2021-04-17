@@ -33,18 +33,18 @@ namespace GrpcNative {
     public function AddMetadata(string $k, string $v): void;
   }
 
-  <<__NativeData("GrpcUnaryCallResult")>>
-  final class UnaryCallResult {
-    private function __construct(): void {
-      throw new InvalidOperationException(
-        __CLASS__." objects cannot be directly created",
-      );
-    }
-    <<__Native>>
-    public function Status(): Status;
-    <<__Native>>
-    public function Response(): string;
-  }
+  /*  <<__NativeData("GrpcUnaryCallResult")>>
+    final class UnaryCallResult {
+      private function __construct(): void {
+        throw new InvalidOperationException(
+          __CLASS__." objects cannot be directly created",
+        );
+      }
+      <<__Native>>
+      public function Status(): Status;
+      <<__Native>>
+      public function Response(): string;
+  	}*/
 
   <<__NativeData("GrpcStreamReader")>>
   final class StreamReader {
@@ -100,7 +100,7 @@ namespace GrpcNative {
       ClientContext $ctx,
       string $method,
       string $request,
-    ): Awaitable<UnaryCallResult>;
+    ): Awaitable<(string, Status)>;
 
 
     <<__Native>>

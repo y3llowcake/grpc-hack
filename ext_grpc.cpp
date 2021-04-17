@@ -85,13 +85,12 @@ NATIVE_GET_METHOD(String, GrpcChannel, Debug, d->data_->Debug());
 // UnaryCall
 //
 struct GrpcCallResultData : Deserializer {
-  GrpcCallResultData() : resp_("") {}
-
   // This function *must* be called on a HHVM request thread, not an
-  // ASIO/callback thread.
-  void CopyToHHVMRequestMemory() {
+  // ASIO/callback thread. It should be called before any call to
+  // UnserializeStatus.
+  String UnserializeResponse() {
     if (!gresp_) {
-      return;
+      return String("");
     }
     SliceList slices;
     auto status = gresp_->Slices(&slices);
@@ -102,7 +101,7 @@ struct GrpcCallResultData : Deserializer {
       if (status_.Ok()) {
         status_ = status;
       }
-      return;
+      return String("");
     }
     size_t total = 0;
     for (auto s : slices) {
@@ -115,24 +114,20 @@ struct GrpcCallResultData : Deserializer {
       pos += s.second;
     }
     buf->setSize(total);
-    resp_ = String(buf);
     gresp_.reset(); // Drop our reference to the response buffer.
+    return String(buf);
   }
+
+  // TODO: Copy discalimer above
+  Object UnserializeStatus() { return GrpcStatus::newInstance(status_); }
 
   void ResponseReady(std::unique_ptr<Response> r) override {
     gresp_ = std::move(r);
   }
 
   Status status_;
-  String resp_;
   std::unique_ptr<Response> gresp_;
 };
-
-NATIVE_DATA_CLASS(GrpcUnaryCallResult, GrpcNative\\UnaryCallResult,
-                  std::unique_ptr<GrpcCallResultData>, std::move(data));
-NATIVE_GET_METHOD(Object, GrpcUnaryCallResult, Status,
-                  GrpcStatus::newInstance(d->data_->status_));
-NATIVE_GET_METHOD(String, GrpcUnaryCallResult, Response, d->data_->resp_);
 
 struct GrpcEvent final : AsioExternalThreadEvent, UnaryResultEvents {
 public:
@@ -161,10 +156,9 @@ protected:
   // Invoked by the ASIO Framework after we have markAsFinished(); this is
   // where we return data to PHP.
   void unserialize(TypedValue &result) override final {
-    data_->CopyToHHVMRequestMemory();
-    // TODO get rid of GrpcUnaryCallResult, return a tuple instead.
-    auto res = GrpcUnaryCallResult::newInstance(std::move(data_));
-    tvCopy(make_tv<KindOfObject>(res.detach()), result);
+    auto resp = data_->UnserializeResponse();
+    auto resTuple = make_varray(resp, data_->UnserializeStatus());
+    tvCopy(make_array_like_tv(resTuple.detach()), result);
   }
 };
 
@@ -185,7 +179,7 @@ NATIVE_DATA_CLASS(GrpcStreamReader, GrpcNative\\StreamReader,
                   std::unique_ptr<GrpcCallResultData>, std::move(data));
 NATIVE_GET_METHOD(Object, GrpcStreamReader, Status,
                   GrpcStatus::newInstance(d->data_->status_));
-NATIVE_GET_METHOD(String, GrpcStreamReader, Response, d->data_->resp_);
+// NATIVE_GET_METHOD(String, GrpcStreamReader, Response, d->data_->resp_);
 
 static Object HHVM_METHOD(GrpcChannel, ServerStreamingCall, const Object &ctx,
                           const String &method, const String &req) {
@@ -261,14 +255,6 @@ struct GrpcExtension : Extension {
     HHVM_MALIAS(GrpcNative\\Channel, Debug, GrpcChannel, Debug);
     Native::registerNativeDataInfo<GrpcChannel>(
         GrpcChannel::s_cppClassName.get());
-
-    // UnaryCallResult
-    HHVM_MALIAS(GrpcNative\\UnaryCallResult, Status, GrpcUnaryCallResult,
-                Status);
-    HHVM_MALIAS(GrpcNative\\UnaryCallResult, Response, GrpcUnaryCallResult,
-                Response);
-    Native::registerNativeDataInfo<GrpcUnaryCallResult>(
-        GrpcUnaryCallResult::s_cppClassName.get());
 
     loadSystemlib();
   }
