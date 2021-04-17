@@ -6,7 +6,6 @@ function main(): void {
   $cargs = GrpcNative\ChannelArguments::Create();
   echo "new\n";
   $channel = GrpcNative\Channel::Create('foo', 'localhost:50051', $cargs);
-  echo "wutang\n";
   $ctx = GrpcNative\ClientContext::Create();
   $r = HH\Asio\join(
     $channel->UnaryCall($ctx, '/helloworld.HelloWorldService/SayHello', ''),
@@ -25,5 +24,7 @@ function main(): void {
     '/helloworld.HelloWorldService/SayHelloStream',
     '',
   );
+  sleep(2);
+
   echo "test fin\n";
 }

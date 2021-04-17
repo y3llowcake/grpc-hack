@@ -45,9 +45,10 @@ class HelloWorldServiceImpl final : public HelloWorldService::Service {
 
   Status SayHelloStream(ServerContext *context, const HelloRequest *request,
                         ServerWriter<HelloReply> *writer) override {
-    std::cout << "received request: '" << request->txt() << "'\n";
+    std::cout << "received streaming request: '" << request->txt() << "'\n";
     std::cout << "context" << context << "\n";
     for (int i = 0; i < 3; i++) {
+      std::cout << "writing streaming reply " << i << std::endl;
       HelloReply reply;
       reply.set_txt("Hello! this is stream response " + std::to_string(i) +
                     " you said: " + request->txt());

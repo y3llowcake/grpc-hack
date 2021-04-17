@@ -122,23 +122,38 @@ class ClientReadReactor : public ::grpc::experimental::ClientReadReactor<T> {
   void OnDone(const ::grpc::Status& s) override {
     printf("wutang done!\n");
   }
-  void OnReadInitialMetadataDone(bool ok) {
+  void OnReadInitialMetadataDone(bool ok) override {
     printf("wutang initial md!\n");
   }
-  virtual void OnReadDone(bool ok) {
+  virtual void OnReadDone(bool ok) override {
     printf("wutang on read done\n");
   }
 };
 
 void ChannelImpl::ServerStreamingCall(const std::string& method, std::shared_ptr<ClientContext> ctx) {
   auto meth = grpc::internal::RpcMethod("/helloworld.HelloWorldService/SayHelloStream",
+  //auto meth = grpc::internal::RpcMethod(method.c_str(),
                                         grpc::internal::RpcMethod::SERVER_STREAMING);
-  //std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
-  grpc::ByteBuffer req;
-  grpc::ByteBuffer resp;
-  printf("wutang forver\n");
+  auto req = new grpc::ByteBuffer(NULL, 0);
+  auto resp = new grpc::ByteBuffer();
+  printf("wutang\n");
   auto reactor = new ClientReadReactor<grpc::ByteBuffer>();
- 
+  ::grpc::internal::ClientCallbackReaderFactory<grpc::ByteBuffer>::Create(
+    channel_.get(),
+    meth, 
+    ClientContextImpl::from(ctx.get())->ctx_.get(),
+    req, 
+    reactor
+    );
+
+ //reactor->AddHold();
+ reactor->StartRead(resp);
+ printf("startingcall\n");
+ //reactor->AddHold();
+ reactor->StartCall();
+  printf("forever\n");
+
+  
 
   //reactor ClientReadReactor<groc::ByteBuffer>;
   // ClientCallbackReaderFactory<grpc::ByteBuffer>::Create(channel_.get(), meth, &ctx->ctx_, &req, reactor);
@@ -242,6 +257,6 @@ public:
 
 void GrpcClientInit() {
   grpc_init();
-  // gpr_set_log_verbosity(GPR_LOG_SEVERITY_DEBUG);
+  //gpr_set_log_verbosity(GPR_LOG_SEVERITY_DEBUG);
   ChannelStore::Singleton = new ChannelStore();
 }
