@@ -55,6 +55,12 @@ namespace GrpcNative {
     }
     <<__Native>>
     public static function Create(): ChannelArguments;
+    <<__Native>>
+    public function SetMaxMessageReceiveSize(int $size): void;
+    <<__Native>>
+    public function SetMaxMessageSendSize(int $size): void;
+    <<__Native>>
+    public function SetLoadBalancingPolicyName(string $name): void;
 
   }
 

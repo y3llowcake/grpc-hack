@@ -94,6 +94,13 @@ NATIVE_GET_METHOD(String, GrpcUnaryCallResult, Response, d->data_->resp_);
 //
 NATIVE_DATA_CLASS(GrpcChannelArguments, GrpcNative\\ChannelArguments,
                   std::shared_ptr<ChannelArguments>, std::move(data));
+NATIVE_SET_METHOD(GrpcChannelArguments, SetMaxReceiveMessageSize,
+                  d->data_->SetMaxReceiveMessageSize(size), int size);
+NATIVE_SET_METHOD(GrpcChannelArguments, SetMaxSendMessageSize,
+                  d->data_->SetMaxSendMessageSize(size), int size);
+NATIVE_SET_METHOD(GrpcChannelArguments, SetLoadBalancingPolicyName,
+                  d->data_->SetLoadBalancingPolicyName(s.toCppString()),
+                  const String &s);
 Object HHVM_STATIC_METHOD(GrpcChannelArguments, Create) {
   return GrpcChannelArguments::newInstance(std::move(ChannelArguments::New()));
 }
@@ -168,29 +175,8 @@ protected:
   }
 };
 
-// const auto optTimeoutMicros = HPHP::StaticString("timeout_micros");
-// const auto optMetadata = HPHP::StaticString("metadata");
 static Object HHVM_METHOD(GrpcChannel, UnaryCall, const Object &ctx,
                           const String &method, const String &req) {
-  /*  UnaryCallParams p;
-    p.method_ = method.toCppString();
-    if (opt.exists(optTimeoutMicros)) {
-      p.timeout_micros_ = opt[optTimeoutMicros].toInt64();
-    }
-
-    if (opt.exists(optMetadata)) {
-      auto metadata = opt[optMetadata].toDict();
-      for (auto it = metadata.begin(); !it.end(); it.next()) {
-        auto k = it.first().toString().toCppString();
-        if (p.md_.find(k) == p.md_.end()) {
-          p.md_[k] = std::vector<std::string>();
-        }
-        for (auto vit = it.second().toArray().begin(); !vit.end(); vit.next()) {
-          p.md_[k].push_back(vit.second().toString().toCppString());
-        }
-      }
-    }*/
-
   auto event = new GrpcEvent(req);
   auto *d = Native::data<GrpcChannel>(this_);
   auto *dctx = Native::data<GrpcClientContext>(ctx);
@@ -204,7 +190,6 @@ static void HHVM_METHOD(GrpcChannel, serverStreamingCallInternal,
   d->data_->ServerStreamingCall();
 }
 
-const StaticString s_ChannelData("ChannelData");
 struct GrpcExtension : Extension {
   GrpcExtension() : Extension("grpc", "0.0.1") { GrpcClientInit(); }
 
@@ -230,6 +215,12 @@ struct GrpcExtension : Extension {
     // ChannelArguments
     HHVM_STATIC_MALIAS(GrpcNative\\ChannelArguments, Create,
                        GrpcChannelArguments, Create);
+    HHVM_MALIAS(GrpcNative\\ChannelArguments, SetMaxReceiveMessageSize,
+                GrpcChannelArguments, SetMaxReceiveMessageSize);
+    HHVM_MALIAS(GrpcNative\\ChannelArguments, SetMaxSendMessageSize,
+                GrpcChannelArguments, SetMaxSendMessageSize);
+    HHVM_MALIAS(GrpcNative\\ChannelArguments, SetLoadBalancingPolicyName,
+                GrpcChannelArguments, SetLoadBalancingPolicyName);
     Native::registerNativeDataInfo<GrpcChannelArguments>(
         GrpcChannelArguments::s_cppClassName.get());
 
