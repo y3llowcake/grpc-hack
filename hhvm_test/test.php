@@ -24,7 +24,7 @@ function main(): void {
     '/helloworld.HelloWorldService/SayHelloStream',
     '',
   );
-  sleep(2);
+  sleep(1);
 
   echo "test fin\n";
 }

@@ -33,6 +33,7 @@ struct ClientContextImpl: ClientContext {
   std::string Peer() override {
     return peer_;
   }
+
   void SetTimeoutMicros(int to) override {
     if (to > 0) {
       auto gprto =
@@ -41,9 +42,15 @@ struct ClientContextImpl: ClientContext {
       ctx_->set_deadline(gprto);
     }
   }
+
   void AddMetadata(const std::string& k, const std::string& v) override {
     ctx_->AddMetadata(k, v);
   }
+
+  void capturePeer() {
+    peer_ = ctx_->peer();
+  }
+
   static inline ClientContextImpl* from(ClientContext* c) {
     return static_cast<ClientContextImpl*>(c);
   }
@@ -87,9 +94,9 @@ struct ChannelImpl : Channel {
   grpc_channel *core_channel_; // not owned
 
   void
-  GrpcClientUnaryCall(const std::string &method,
+  UnaryCall(const std::string &method,
       std::shared_ptr<ClientContext> ctx,
-                      GrpcClientUnaryResultEvent *ev) override;
+                      UnaryResultEvents *ev) override;
 
   void ServerStreamingCall(const std::string &method, std::shared_ptr<ClientContext> ctx) override;
 
@@ -101,17 +108,18 @@ struct ChannelImpl : Channel {
 };
 
 void
-ChannelImpl::GrpcClientUnaryCall(const std::string& method,
+ChannelImpl::UnaryCall(const std::string& method,
   std::shared_ptr<ClientContext> ctx,
-                                 GrpcClientUnaryResultEvent *ev) {
+                                 UnaryResultEvents *ev) {
+  // TODO consider using the ClientUnaryReactor API instead, which would give a
+  // hook for initial metadata being ready.
   auto meth = grpc::internal::RpcMethod(method.c_str(),
                                         grpc::internal::RpcMethod::NORMAL_RPC);
   ::grpc::internal::CallbackUnaryCall<
-      GrpcClientUnaryResultEvent, GrpcClientUnaryResultEvent,
-      GrpcClientUnaryResultEvent, GrpcClientUnaryResultEvent>(
+      UnaryResultEvents, UnaryResultEvents,
+      UnaryResultEvents, UnaryResultEvents>(
       channel_.get(), meth, ClientContextImpl::from(ctx.get())->ctx_.get(), ev, ev, [ctx, ev](grpc::Status s) {
-      auto ctxi = ClientContextImpl::from(ctx.get());
-      ctxi->peer_ = ctxi->ctx_->peer();
+        ClientContextImpl::from(ctx.get())->capturePeer();
         ev->Done(FromGrpcStatus(s));
       });
 }
@@ -120,24 +128,30 @@ template <class T>
 class ClientReadReactor : public ::grpc::experimental::ClientReadReactor<T> {
   public:
   void OnDone(const ::grpc::Status& s) override {
-    printf("wutang done!\n");
+    printf("wutang done!!!!!!!!!!!!!!\n");
+    ClientContextImpl::from(ctx_.get())->capturePeer();
   }
   void OnReadInitialMetadataDone(bool ok) override {
     printf("wutang initial md!\n");
+    ClientContextImpl::from(ctx_.get())->capturePeer();
   }
   virtual void OnReadDone(bool ok) override {
-    printf("wutang on read done\n");
+    if (ok) {
+      std::cout << "wutang on read done " << ok << std::endl;
+      this->StartRead(new T());
+    }
   }
+  std::shared_ptr<ClientContext> ctx_;
 };
 
 void ChannelImpl::ServerStreamingCall(const std::string& method, std::shared_ptr<ClientContext> ctx) {
-  auto meth = grpc::internal::RpcMethod("/helloworld.HelloWorldService/SayHelloStream",
-  //auto meth = grpc::internal::RpcMethod(method.c_str(),
+  auto meth = grpc::internal::RpcMethod(method.c_str(),
                                         grpc::internal::RpcMethod::SERVER_STREAMING);
   auto req = new grpc::ByteBuffer(NULL, 0);
   auto resp = new grpc::ByteBuffer();
   printf("wutang\n");
   auto reactor = new ClientReadReactor<grpc::ByteBuffer>();
+  reactor->ctx_ = ctx;
   ::grpc::internal::ClientCallbackReaderFactory<grpc::ByteBuffer>::Create(
     channel_.get(),
     meth, 
@@ -147,9 +161,9 @@ void ChannelImpl::ServerStreamingCall(const std::string& method, std::shared_ptr
     );
 
  //reactor->AddHold();
+ // https://github.com/grpc/grpc/blob/dae5624e47f3e7ad38d71d71a8667a6c630fa9be/include/grpcpp/impl/codegen/client_callback.h#L283
  reactor->StartRead(resp);
  printf("startingcall\n");
- //reactor->AddHold();
  reactor->StartCall();
   printf("forever\n");
 
@@ -215,7 +229,7 @@ std::shared_ptr<Channel> GetChannel(const std::string &name,
 // SerDe
 //
 
-struct DeserializerImpl : Deserializer {
+struct ResponseImpl : Response {
   Status ResponseSlices(SliceList *list) override {
     std::vector<grpc::Slice> slices;
     auto status = bb_.Dump(&slices);
@@ -232,17 +246,16 @@ struct DeserializerImpl : Deserializer {
 };
 
 // https://grpc.github.io/grpc/cpp/classgrpc_1_1_serialization_traits.html
-template <> class grpc::SerializationTraits<GrpcClientUnaryResultEvent, void> {
+template <> class grpc::SerializationTraits<UnaryResultEvents, void> {
 public:
   static grpc::Status Deserialize(ByteBuffer *byte_buffer,
-                                  GrpcClientUnaryResultEvent *dest) {
-    auto d = new DeserializerImpl();
-    d->bb_.Swap(byte_buffer);
-    std::unique_ptr<Deserializer> dp(d);
-    dest->Response(std::move(dp));
+                                  UnaryResultEvents *dest) {
+    auto r = new ResponseImpl();
+    r->bb_.Swap(byte_buffer);
+    dest->ResponseReady(std::move(std::unique_ptr<Response>(r)));
     return Status::OK;
   }
-  static grpc::Status Serialize(const GrpcClientUnaryResultEvent &source,
+  static grpc::Status Serialize(const UnaryResultEvents &source,
                                 ByteBuffer *buffer, bool *own_buffer) {
     const void *c;
     size_t l;

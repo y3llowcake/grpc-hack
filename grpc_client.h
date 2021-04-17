@@ -22,10 +22,15 @@ struct Status {
 //
 
 typedef std::vector<std::pair<const uint8_t *, size_t>> SliceList;
-struct Deserializer {
+struct Response {
   virtual Status ResponseSlices(SliceList *) = 0;
 };
+
+struct Deserializer {
+  virtual void ResponseReady(std::unique_ptr<Response>) = 0;
+};
 struct Serializer {
+  // Invoked when the request content is being serialized to the wire.
   virtual void FillRequest(const void **, size_t *) const = 0;
 };
 
@@ -46,13 +51,7 @@ struct ClientContext {
 // Unary Calls.
 //
 
-struct GrpcClientUnaryResultEvent {
-  // Invoked when the request content is being serialized to the wire.
-  virtual void FillRequest(const void **, size_t *) const = 0;
-
-  // Invoked when the response is available to be deserialized from the wire.
-  virtual void Response(std::unique_ptr<Deserializer>) = 0;
-
+struct UnaryResultEvents : Serializer, Deserializer {
   // Invoked on completion.
   virtual void Done(Status s) = 0; // TODO parameter should be const ref?
 };
@@ -72,9 +71,9 @@ struct ChannelArguments {
 //
 
 struct Channel {
-  virtual void GrpcClientUnaryCall(const std::string &method,
-                                   std::shared_ptr<ClientContext> ctx,
-                                   GrpcClientUnaryResultEvent *) = 0;
+  virtual void UnaryCall(const std::string &method,
+                         std::shared_ptr<ClientContext> ctx,
+                         UnaryResultEvents *) = 0;
   virtual void ServerStreamingCall(const std::string &method,
                                    std::shared_ptr<ClientContext> ctx) = 0;
   virtual std::string Debug() = 0;

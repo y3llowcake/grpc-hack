@@ -118,7 +118,7 @@ Object HHVM_STATIC_METHOD(GrpcChannel, Create, const String &name,
 }
 NATIVE_GET_METHOD(String, GrpcChannel, Debug, d->data_->Debug());
 
-struct GrpcEvent final : AsioExternalThreadEvent, GrpcClientUnaryResultEvent {
+struct GrpcEvent final : AsioExternalThreadEvent, UnaryResultEvents {
 public:
   GrpcEvent(const String &req)
       : data_(std::make_unique<UnaryCallResultData>()), req_(req) {}
@@ -134,21 +134,21 @@ public:
     *l = req_.size();
   }
 
-  void Response(std::unique_ptr<Deserializer> d) override {
-    deser_ = std::move(d);
+  void ResponseReady(std::unique_ptr<Response> r) override {
+    resp_ = std::move(r);
   }
 
   std::unique_ptr<UnaryCallResultData> data_;
-  std::unique_ptr<Deserializer> deser_;
+  std::unique_ptr<Response> resp_;
   const String req_;
 
 protected:
   // Invoked by the ASIO Framework after we have markAsFinished(); this is
   // where we return data to PHP.
   void unserialize(TypedValue &result) override final {
-    if (deser_) {
+    if (resp_) {
       SliceList slices;
-      auto status = deser_->ResponseSlices(&slices);
+      auto status = resp_->ResponseSlices(&slices);
       if (!status.Ok()) {
         if (!data_->status_.Ok()) { // take first failure.
           data_->status_ = status;
@@ -167,7 +167,7 @@ protected:
 
         buf->setSize(total);
         data_->resp_ = String(buf);
-        deser_.reset(nullptr); // free the grpc::ByteBuffer now.
+        resp_.reset(nullptr); // free the grpc::ByteBuffer now.
       }
     }
     auto res = GrpcUnaryCallResult::newInstance(std::move(data_));
@@ -180,7 +180,7 @@ static Object HHVM_METHOD(GrpcChannel, UnaryCall, const Object &ctx,
   auto event = new GrpcEvent(req);
   auto *d = Native::data<GrpcChannel>(this_);
   auto *dctx = Native::data<GrpcClientContext>(ctx);
-  d->data_->GrpcClientUnaryCall(method.toCppString(), dctx->data_, event);
+  d->data_->UnaryCall(method.toCppString(), dctx->data_, event);
   return Object{event->getWaitHandle()};
 }
 
