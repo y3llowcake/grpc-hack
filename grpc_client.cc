@@ -100,6 +100,41 @@ struct ChannelImpl : Channel {
   std::string Debug() override { return DebugJson().Dump(2); }
 };
 
+void
+ChannelImpl::GrpcClientUnaryCall(const std::string& method,
+  std::shared_ptr<ClientContext> ctx,
+                                 GrpcClientUnaryResultEvent *ev) {
+  auto meth = grpc::internal::RpcMethod(method.c_str(),
+                                        grpc::internal::RpcMethod::NORMAL_RPC);
+  ::grpc::internal::CallbackUnaryCall<
+      GrpcClientUnaryResultEvent, GrpcClientUnaryResultEvent,
+      GrpcClientUnaryResultEvent, GrpcClientUnaryResultEvent>(
+      channel_.get(), meth, ClientContextImpl::from(ctx.get())->ctx_.get(), ev, ev, [ctx, ev](grpc::Status s) {
+      auto ctxi = ClientContextImpl::from(ctx.get());
+      ctxi->peer_ = ctxi->ctx_->peer();
+        ev->Done(FromGrpcStatus(s));
+      });
+  //return std::move(ctx);
+}
+
+void ChannelImpl::ServerStreamingCall() {
+  auto meth = grpc::internal::RpcMethod("/helloworld.HelloWorldService/SayHelloStream",
+                                        grpc::internal::RpcMethod::SERVER_STREAMING);
+  //std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
+  grpc::ByteBuffer req;
+  grpc::ByteBuffer resp;
+  //reactor ClientReadReactor<groc::ByteBuffer>;
+  // ClientCallbackReaderFactory<grpc::ByteBuffer>::Create(channel_.get(), meth, &ctx->ctx_, &req, reactor);
+  // ClientCallbackReader
+  // ClientCallbackReaderImpl 
+  // ClientCallbackReaderFactory
+}
+
+
+//
+// ChannelStore
+//
+
 class ChannelStore {
 public:
   static ChannelStore *Singleton;
@@ -131,16 +166,6 @@ public:
     return record;
   }
 
-  /*
-    std::string Debug() override {
-      std::lock_guard<std::mutex> guard(mu_);
-      grpc_core::Json::Object o;
-      for(auto kv : map_) {
-        o[kv.first] = kv.second->DebugJson();
-      }
-      return grpc_core::Json(o).Dump(2);
-    }
-        */
 private:
   std::mutex mu_;
   std::unordered_map<std::string, std::shared_ptr<ChannelImpl>> map_;
@@ -148,60 +173,15 @@ private:
 
 ChannelStore *ChannelStore::Singleton = nullptr;
 
-void GrpcClientInit() {
-  grpc_init();
-  // gpr_set_log_verbosity(GPR_LOG_SEVERITY_DEBUG);
-  ChannelStore::Singleton = new ChannelStore();
-}
-
 std::shared_ptr<Channel> GetChannel(const std::string &name,
                                     const std::string &target,
                                     std::shared_ptr<ChannelArguments> args) {
   return ChannelStore::Singleton->GetChannel(name, target, std::move(args));
 }
 
-/*std::string GrpcClientDebug() {
-  return ChannelStore::Singleton->Debug();
-}*/
-
-void
-ChannelImpl::GrpcClientUnaryCall(const std::string& method,
-  std::shared_ptr<ClientContext> ctx,
-                                 GrpcClientUnaryResultEvent *ev) {
-/*  std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
-  for (auto kv : p.md_) {
-    for (auto v : kv.second) {
-      ctx->ctx_.AddMetadata(kv.first, v);
-    }
-  }*/
-  
-  auto meth = grpc::internal::RpcMethod(method.c_str(),
-                                        grpc::internal::RpcMethod::NORMAL_RPC);
-  ::grpc::internal::CallbackUnaryCall<
-      GrpcClientUnaryResultEvent, GrpcClientUnaryResultEvent,
-      GrpcClientUnaryResultEvent, GrpcClientUnaryResultEvent>(
-      channel_.get(), meth, ClientContextImpl::from(ctx.get())->ctx_.get(), ev, ev, [ctx, ev](grpc::Status s) {
-      auto ctxi = ClientContextImpl::from(ctx.get());
-      ctxi->peer_ = ctxi->ctx_->peer();
-        ev->Done(FromGrpcStatus(s));
-      });
-  //return std::move(ctx);
-}
-
-
-
-void ChannelImpl::ServerStreamingCall() {
-  auto meth = grpc::internal::RpcMethod("/helloworld.HelloWorldService/SayHelloStream",
-                                        grpc::internal::RpcMethod::SERVER_STREAMING);
-  //std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
-  grpc::ByteBuffer req;
-  grpc::ByteBuffer resp;
-  //reactor ClientReadReactor<groc::ByteBuffer>;
-  // ClientCallbackReaderFactory<grpc::ByteBuffer>::Create(channel_.get(), meth, &ctx->ctx_, &req, reactor);
-  // ClientCallbackReader
-  // ClientCallbackReaderImpl 
-  // ClientCallbackReaderFactory
-}
+//
+// SerDe
+//
 
 struct DeserializerImpl : Deserializer {
   Status ResponseSlices(SliceList *list) override {
@@ -242,3 +222,11 @@ public:
     return Status::OK;
   }
 };
+
+void GrpcClientInit() {
+  grpc_init();
+  // gpr_set_log_verbosity(GPR_LOG_SEVERITY_DEBUG);
+  ChannelStore::Singleton = new ChannelStore();
+}
+
+
