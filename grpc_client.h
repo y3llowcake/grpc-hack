@@ -75,7 +75,8 @@ struct Channel {
   virtual void GrpcClientUnaryCall(const std::string &method,
                                    std::shared_ptr<ClientContext> ctx,
                                    GrpcClientUnaryResultEvent *) = 0;
-  virtual void ServerStreamingCall() = 0;
+  virtual void ServerStreamingCall(const std::string &method,
+                                   std::shared_ptr<ClientContext> ctx) = 0;
   virtual std::string Debug() = 0;
 };
 

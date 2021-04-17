@@ -184,10 +184,11 @@ static Object HHVM_METHOD(GrpcChannel, UnaryCall, const Object &ctx,
   return Object{event->getWaitHandle()};
 }
 
-static void HHVM_METHOD(GrpcChannel, serverStreamingCallInternal,
+static void HHVM_METHOD(GrpcChannel, ServerStreamingCall, const Object &ctx,
                         const String &method, const String &req) {
   auto *d = Native::data<GrpcChannel>(this_);
-  d->data_->ServerStreamingCall();
+  auto *dctx = Native::data<GrpcClientContext>(ctx);
+  d->data_->ServerStreamingCall(method.toCppString(), dctx->data_);
 }
 
 struct GrpcExtension : Extension {
@@ -227,8 +228,8 @@ struct GrpcExtension : Extension {
     // Channel
     HHVM_STATIC_MALIAS(GrpcNative\\Channel, Create, GrpcChannel, Create);
     HHVM_MALIAS(GrpcNative\\Channel, UnaryCall, GrpcChannel, UnaryCall);
-    HHVM_MALIAS(GrpcNative\\Channel, serverStreamingCallInternal, GrpcChannel,
-                serverStreamingCallInternal);
+    HHVM_MALIAS(GrpcNative\\Channel, ServerStreamingCall, GrpcChannel,
+                ServerStreamingCall);
     HHVM_MALIAS(GrpcNative\\Channel, Debug, GrpcChannel, Debug);
     Native::registerNativeDataInfo<GrpcChannel>(
         GrpcChannel::s_cppClassName.get());

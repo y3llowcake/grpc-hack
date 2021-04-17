@@ -91,7 +91,7 @@ struct ChannelImpl : Channel {
       std::shared_ptr<ClientContext> ctx,
                       GrpcClientUnaryResultEvent *ev) override;
 
-  void ServerStreamingCall() override;
+  void ServerStreamingCall(const std::string &method, std::shared_ptr<ClientContext> ctx) override;
 
   grpc_core::Json DebugJson() {
     return grpc_channel_get_channelz_node(core_channel_)->RenderJson();
@@ -114,15 +114,32 @@ ChannelImpl::GrpcClientUnaryCall(const std::string& method,
       ctxi->peer_ = ctxi->ctx_->peer();
         ev->Done(FromGrpcStatus(s));
       });
-  //return std::move(ctx);
 }
 
-void ChannelImpl::ServerStreamingCall() {
+template <class T>
+class ClientReadReactor : public ::grpc::experimental::ClientReadReactor<T> {
+  public:
+  void OnDone(const ::grpc::Status& s) override {
+    printf("wutang done!\n");
+  }
+  void OnReadInitialMetadataDone(bool ok) {
+    printf("wutang initial md!\n");
+  }
+  virtual void OnReadDone(bool ok) {
+    printf("wutang on read done\n");
+  }
+};
+
+void ChannelImpl::ServerStreamingCall(const std::string& method, std::shared_ptr<ClientContext> ctx) {
   auto meth = grpc::internal::RpcMethod("/helloworld.HelloWorldService/SayHelloStream",
                                         grpc::internal::RpcMethod::SERVER_STREAMING);
   //std::shared_ptr<ClientContextImpl> ctx(new ClientContextImpl());
   grpc::ByteBuffer req;
   grpc::ByteBuffer resp;
+  printf("wutang forver\n");
+  auto reactor = new ClientReadReactor<grpc::ByteBuffer>();
+ 
+
   //reactor ClientReadReactor<groc::ByteBuffer>;
   // ClientCallbackReaderFactory<grpc::ByteBuffer>::Create(channel_.get(), meth, &ctx->ctx_, &req, reactor);
   // ClientCallbackReader
@@ -228,5 +245,3 @@ void GrpcClientInit() {
   // gpr_set_log_verbosity(GPR_LOG_SEVERITY_DEBUG);
   ChannelStore::Singleton = new ChannelStore();
 }
-
-

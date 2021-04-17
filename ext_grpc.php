@@ -86,12 +86,10 @@ namespace GrpcNative {
       string $request,
     ): Awaitable<UnaryCallResult>;
 
-    public function ServerStreamingCall(): void {
-      $this->serverStreamingCallInternal('', '');
-    }
 
     <<__Native>>
-    public function serverStreamingCallInternal(
+    public function ServerStreamingCall(
+      ClientContext $ctx,
       string $method,
       string $request,
     ): void;

@@ -19,6 +19,11 @@ function main(): void {
   echo "response: '{$resp}'\n";
   echo "peer: '".$ctx->Peer()."'\n";
   echo $channel->Debug()."\n";
-  $channel->ServerStreamingCall('', '');
+  $ctx = GrpcNative\ClientContext::Create();
+  $channel->ServerStreamingCall(
+    $ctx,
+    '/helloworld.HelloWorldService/SayHelloStream',
+    '',
+  );
   echo "test fin\n";
 }
