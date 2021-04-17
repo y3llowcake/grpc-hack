@@ -46,8 +46,24 @@ namespace GrpcNative {
     public function Response(): string;
   }
 
+  <<__NativeData("GrpcStreamReader")>>
+  final class StreamReader {
+    private function __construct(): void {
+      throw new InvalidOperationException(
+        __CLASS__." objects cannot be directly created",
+      );
+    }
+    <<__Native>>
+    public function Read(): Awaitable<bool>;
+    <<__Native>>
+    public function Status(): Status;
+    <<__Native>>
+    public function Response(): string;
+  }
+
+
   <<__NativeData("GrpcChannelArguments")>>
-  class ChannelArguments {
+  final class ChannelArguments {
     private function __construct(): void {
       throw new InvalidOperationException(
         __CLASS__." objects cannot be directly created",
@@ -65,7 +81,7 @@ namespace GrpcNative {
   }
 
   <<__NativeData("GrpcChannel")>>
-  class Channel {
+  final class Channel {
     private function __construct(): void {
       throw new InvalidOperationException(
         __CLASS__." objects cannot be directly created",
@@ -92,7 +108,7 @@ namespace GrpcNative {
       ClientContext $ctx,
       string $method,
       string $request,
-    ): void;
+    ): StreamReader;
 
     <<__Native>>
     function Debug(): string;

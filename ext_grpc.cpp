@@ -75,19 +75,127 @@ NATIVE_SET_METHOD(GrpcClientContext, AddMetadata,
                   const String &k, const String &v);
 
 //
-// UnaryCallResult
+// Channel
 //
-struct UnaryCallResultData {
+NATIVE_DATA_CLASS(GrpcChannel, GrpcNative\\Channel, std::shared_ptr<Channel>,
+                  std::move(data));
+NATIVE_GET_METHOD(String, GrpcChannel, Debug, d->data_->Debug());
+
+//
+// UnaryCall
+//
+struct GrpcCallResultData : Deserializer {
+  GrpcCallResultData() : resp_("") {}
+
+  // This function *must* be called on a HHVM request thread, not an
+  // ASIO/callback thread.
+  void CopyToHHVMRequestMemory() {
+    if (!gresp_) {
+      return;
+    }
+    SliceList slices;
+    auto status = gresp_->Slices(&slices);
+    if (!status.Ok()) {
+      gresp_.reset(); // Drop our reference to the response buffer.
+      // We may already be in an error state, in which case we prefer the first
+      // error message.
+      if (status_.Ok()) {
+        status_ = status;
+      }
+      return;
+    }
+    size_t total = 0;
+    for (auto s : slices) {
+      total += s.second;
+    }
+    auto buf = StringData::Make(total);
+    auto pos = buf->mutableData();
+    for (auto s : slices) {
+      std::copy_n(s.first, s.second, pos);
+      pos += s.second;
+    }
+    buf->setSize(total);
+    resp_ = String(buf);
+    gresp_.reset(); // Drop our reference to the response buffer.
+  }
+
+  void ResponseReady(std::unique_ptr<Response> r) override {
+    gresp_ = std::move(r);
+  }
+
   Status status_;
   String resp_;
-  UnaryCallResultData() : resp_("") {}
+  std::unique_ptr<Response> gresp_;
 };
 
 NATIVE_DATA_CLASS(GrpcUnaryCallResult, GrpcNative\\UnaryCallResult,
-                  std::unique_ptr<UnaryCallResultData>, std::move(data));
+                  std::unique_ptr<GrpcCallResultData>, std::move(data));
 NATIVE_GET_METHOD(Object, GrpcUnaryCallResult, Status,
                   GrpcStatus::newInstance(d->data_->status_));
 NATIVE_GET_METHOD(String, GrpcUnaryCallResult, Response, d->data_->resp_);
+
+struct GrpcEvent final : AsioExternalThreadEvent, UnaryResultEvents {
+public:
+  GrpcEvent(const String &req)
+      : data_(std::make_unique<GrpcCallResultData>()), req_(req) {}
+
+  void Done(Status s) override {
+    data_->status_ = s;
+    markAsFinished();
+    req_.reset(); // Drop our reference to the request buffer.
+  }
+
+  void FillRequest(const void **c, size_t *l) const override {
+    *c = req_.data();
+    *l = req_.size();
+  }
+
+  void ResponseReady(std::unique_ptr<Response> r) override {
+    data_->ResponseReady(std::move(r));
+  }
+
+  std::unique_ptr<GrpcCallResultData> data_;
+  String req_;
+
+protected:
+  // Invoked by the ASIO Framework after we have markAsFinished(); this is
+  // where we return data to PHP.
+  void unserialize(TypedValue &result) override final {
+    data_->CopyToHHVMRequestMemory();
+    // TODO get rid of GrpcUnaryCallResult, return a tuple instead.
+    auto res = GrpcUnaryCallResult::newInstance(std::move(data_));
+    tvCopy(make_tv<KindOfObject>(res.detach()), result);
+  }
+};
+
+static Object HHVM_METHOD(GrpcChannel, UnaryCall, const Object &ctx,
+                          const String &method, const String &req) {
+  auto event = new GrpcEvent(req);
+  auto *d = Native::data<GrpcChannel>(this_);
+  auto *dctx = Native::data<GrpcClientContext>(ctx);
+  d->data_->UnaryCall(method.toCppString(), dctx->data_, event);
+  return Object{event->getWaitHandle()};
+}
+
+//
+// Streaming Call
+//
+
+NATIVE_DATA_CLASS(GrpcStreamReader, GrpcNative\\StreamReader,
+                  std::unique_ptr<GrpcCallResultData>, std::move(data));
+NATIVE_GET_METHOD(Object, GrpcStreamReader, Status,
+                  GrpcStatus::newInstance(d->data_->status_));
+NATIVE_GET_METHOD(String, GrpcStreamReader, Response, d->data_->resp_);
+
+static Object HHVM_METHOD(GrpcChannel, ServerStreamingCall, const Object &ctx,
+                          const String &method, const String &req) {
+  auto *d = Native::data<GrpcChannel>(this_);
+  auto *dctx = Native::data<GrpcClientContext>(ctx);
+  auto ret =
+      GrpcStreamReader::newInstance(std::make_unique<GrpcCallResultData>());
+  d->data_->ServerStreamingCall(method.toCppString(), dctx->data_);
+  return ret;
+}
 
 //
 // ChannelArguments
@@ -104,91 +212,11 @@ NATIVE_SET_METHOD(GrpcChannelArguments, SetLoadBalancingPolicyName,
 Object HHVM_STATIC_METHOD(GrpcChannelArguments, Create) {
   return GrpcChannelArguments::newInstance(std::move(ChannelArguments::New()));
 }
-
-//
-// Channel
-//
-NATIVE_DATA_CLASS(GrpcChannel, GrpcNative\\Channel, std::shared_ptr<Channel>,
-                  std::move(data));
 Object HHVM_STATIC_METHOD(GrpcChannel, Create, const String &name,
                           const String &target, const Object &args) {
   auto *dca = Native::data<GrpcChannelArguments>(args);
   return GrpcChannel::newInstance(std::move(
       GetChannel(name.toCppString(), target.toCppString(), dca->data_)));
-}
-NATIVE_GET_METHOD(String, GrpcChannel, Debug, d->data_->Debug());
-
-struct GrpcEvent final : AsioExternalThreadEvent, UnaryResultEvents {
-public:
-  GrpcEvent(const String &req)
-      : data_(std::make_unique<UnaryCallResultData>()), req_(req) {}
-
-  void Done(Status s) override {
-    data_->status_ = s;
-    markAsFinished();
-    // TODO release req_ here?
-  }
-
-  void FillRequest(const void **c, size_t *l) const override {
-    *c = req_.data();
-    *l = req_.size();
-  }
-
-  void ResponseReady(std::unique_ptr<Response> r) override {
-    resp_ = std::move(r);
-  }
-
-  std::unique_ptr<UnaryCallResultData> data_;
-  std::unique_ptr<Response> resp_;
-  const String req_;
-
-protected:
-  // Invoked by the ASIO Framework after we have markAsFinished(); this is
-  // where we return data to PHP.
-  void unserialize(TypedValue &result) override final {
-    if (resp_) {
-      SliceList slices;
-      auto status = resp_->ResponseSlices(&slices);
-      if (!status.Ok()) {
-        if (!data_->status_.Ok()) { // take first failure.
-          data_->status_ = status;
-        }
-      } else {
-        size_t total = 0;
-        for (auto s : slices) {
-          total += s.second;
-        }
-        auto buf = StringData::Make(total);
-        auto pos = buf->mutableData();
-        for (auto s : slices) {
-          std::copy_n(s.first, s.second, pos);
-          pos += s.second;
-        }
-
-        buf->setSize(total);
-        data_->resp_ = String(buf);
-        resp_.reset(nullptr); // free the grpc::ByteBuffer now.
-      }
-    }
-    auto res = GrpcUnaryCallResult::newInstance(std::move(data_));
-    tvCopy(make_tv<KindOfObject>(res.detach()), result);
-  }
-};
-
-static Object HHVM_METHOD(GrpcChannel, UnaryCall, const Object &ctx,
-                          const String &method, const String &req) {
-  auto event = new GrpcEvent(req);
-  auto *d = Native::data<GrpcChannel>(this_);
-  auto *dctx = Native::data<GrpcClientContext>(ctx);
-  d->data_->UnaryCall(method.toCppString(), dctx->data_, event);
-  return Object{event->getWaitHandle()};
-}
-
-static void HHVM_METHOD(GrpcChannel, ServerStreamingCall, const Object &ctx,
-                        const String &method, const String &req) {
-  auto *d = Native::data<GrpcChannel>(this_);
-  auto *dctx = Native::data<GrpcClientContext>(ctx);
-  d->data_->ServerStreamingCall(method.toCppString(), dctx->data_);
 }
 
 struct GrpcExtension : Extension {

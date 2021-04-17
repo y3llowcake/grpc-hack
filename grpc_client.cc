@@ -230,7 +230,7 @@ std::shared_ptr<Channel> GetChannel(const std::string &name,
 //
 
 struct ResponseImpl : Response {
-  Status ResponseSlices(SliceList *list) override {
+  Status Slices(SliceList *list) override {
     std::vector<grpc::Slice> slices;
     auto status = bb_.Dump(&slices);
     if (!status.ok()) {
