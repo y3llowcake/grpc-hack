@@ -3,12 +3,11 @@
 <<__EntryPoint>>
 function main(): void {
   echo "test start\n";
+  $cargs = GrpcNative\ChannelArguments::Create();
+  echo "new\n";
+  $channel = GrpcNative\Channel::Create('foo', 'localhost:50051', $cargs);
+  echo "wutang\n";
   $ctx = GrpcNative\ClientContext::Create();
-  $channel = GrpcNative\Channel::Create(
-    'foo',
-    'localhost:50051',
-    shape('lb_policy_name' => 'round_robin'),
-  );
   $r = HH\Asio\join(
     $channel->UnaryCall($ctx, '/helloworld.HelloWorldService/SayHello', ''),
   );

@@ -62,12 +62,14 @@ NATIVE_GET_METHOD(String, GrpcStatus, Details, d->data_.details_);
 NATIVE_DATA_CLASS(GrpcClientContext, GrpcNative\\ClientContext,
                   std::shared_ptr<ClientContext>, std::move(data));
 Object HHVM_STATIC_METHOD(GrpcClientContext, Create) {
-  return GrpcClientContext::newInstance(
-      std::move(std::shared_ptr(ClientContext::New())));
+  return GrpcClientContext::newInstance(std::move(ClientContext::New()));
 }
 NATIVE_GET_METHOD(String, GrpcClientContext, Peer, d->data_->Peer());
 NATIVE_SET_METHOD(GrpcClientContext, SetTimeoutMicros,
                   d->data_->SetTimeoutMicros(p), int p);
+
+// TODO maybe pass the whole dict in here to avoid crossing the boudnary so
+// much?
 NATIVE_SET_METHOD(GrpcClientContext, AddMetadata,
                   d->data_->AddMetadata(k.toCppString(), v.toCppString()),
                   const String &k, const String &v);
@@ -88,28 +90,24 @@ NATIVE_GET_METHOD(Object, GrpcUnaryCallResult, Status,
 NATIVE_GET_METHOD(String, GrpcUnaryCallResult, Response, d->data_->resp_);
 
 //
+// ChannelArguments
+//
+NATIVE_DATA_CLASS(GrpcChannelArguments, GrpcNative\\ChannelArguments,
+                  std::shared_ptr<ChannelArguments>, std::move(data));
+Object HHVM_STATIC_METHOD(GrpcChannelArguments, Create) {
+  return GrpcChannelArguments::newInstance(std::move(ChannelArguments::New()));
+}
+
+//
 // Channel
 //
 NATIVE_DATA_CLASS(GrpcChannel, GrpcNative\\Channel, std::shared_ptr<Channel>,
                   std::move(data));
-const auto optMaxSend = HPHP::StaticString("max_send_message_size");
-const auto optMaxReceive = HPHP::StaticString("max_receive_message_size");
-const auto optLbPolicy = HPHP::StaticString("lb_policy_name");
 Object HHVM_STATIC_METHOD(GrpcChannel, Create, const String &name,
-                          const String &target, const Array &opt) {
-  ChannelCreateParams p;
-  if (opt.exists(optMaxSend)) {
-    p.max_send_message_size_ = opt[optMaxSend].toInt64();
-  }
-  if (opt.exists(optMaxReceive)) {
-    p.max_receive_message_size_ = opt[optMaxReceive].toInt64();
-  }
-  if (opt.exists(optLbPolicy)) {
-    p.lb_policy_name_ = opt[optLbPolicy].toString().toCppString();
-  }
-
-  return GrpcChannel::newInstance(
-      std::move(GetChannel(name.toCppString(), target.toCppString(), p)));
+                          const String &target, const Object &args) {
+  auto *dca = Native::data<GrpcChannelArguments>(args);
+  return GrpcChannel::newInstance(std::move(
+      GetChannel(name.toCppString(), target.toCppString(), dca->data_)));
 }
 NATIVE_GET_METHOD(String, GrpcChannel, Debug, d->data_->Debug());
 
@@ -228,6 +226,12 @@ struct GrpcExtension : Extension {
                 AddMetadata);
     Native::registerNativeDataInfo<GrpcClientContext>(
         GrpcClientContext::s_cppClassName.get());
+
+    // ChannelArguments
+    HHVM_STATIC_MALIAS(GrpcNative\\ChannelArguments, Create,
+                       GrpcChannelArguments, Create);
+    Native::registerNativeDataInfo<GrpcChannelArguments>(
+        GrpcChannelArguments::s_cppClassName.get());
 
     // Channel
     HHVM_STATIC_MALIAS(GrpcNative\\Channel, Create, GrpcChannel, Create);

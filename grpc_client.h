@@ -58,6 +58,16 @@ struct GrpcClientUnaryResultEvent {
 };
 
 //
+// ChannelArguments
+//
+struct ChannelArguments {
+  static std::shared_ptr<ChannelArguments> New();
+  virtual void SetMaxReceiveMessageSize(int size) = 0;
+  virtual void SetMaxSendMessageSize(int size) = 0;
+  virtual void SetLoadBalancingPolicyName(const std::string &lb) = 0;
+};
+
+//
 // Channels
 //
 
@@ -69,17 +79,9 @@ struct Channel {
   virtual std::string Debug() = 0;
 };
 
-struct ChannelCreateParams {
-  int max_send_message_size_;
-  int max_receive_message_size_;
-  std::string lb_policy_name_;
-  ChannelCreateParams()
-      : max_send_message_size_(0), max_receive_message_size_(0){};
-};
-
 std::shared_ptr<Channel> GetChannel(const std::string &name,
                                     const std::string &target,
-                                    const ChannelCreateParams &params);
+                                    std::shared_ptr<ChannelArguments> args);
 
 //
 // Housekeeping.

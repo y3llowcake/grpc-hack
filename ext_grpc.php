@@ -8,13 +8,10 @@ namespace GrpcNative {
         __CLASS__." objects cannot be directly created",
       );
     }
-
     <<__Native>>
     public function Code(): int;
-
     <<__Native>>
     public function Message(): string;
-
     <<__Native>>
     public function Details(): string;
   }
@@ -26,14 +23,14 @@ namespace GrpcNative {
         __CLASS__." objects cannot be directly created",
       );
     }
-
     <<__Native>>
     public static function Create(): ClientContext;
-
     <<__Native>>
     public function Peer(): string;
     <<__Native>>
     public function SetTimeoutMicros(int $to): void;
+    <<__Native>>
+    public function AddMetadata(string $k, string $v): void;
   }
 
   <<__NativeData("GrpcUnaryCallResult")>>
@@ -43,19 +40,23 @@ namespace GrpcNative {
         __CLASS__." objects cannot be directly created",
       );
     }
-
     <<__Native>>
     public function Status(): Status;
-
     <<__Native>>
     public function Response(): string;
   }
 
-  /*  type ChannelCreateOpt = shape(
-      'max_send_message_size' => ?int,
-      'max_receive_message_size' => ?int,
-      'lb_policy_name' => ?string,
-  );*/
+  <<__NativeData("GrpcChannelArguments")>>
+  class ChannelArguments {
+    private function __construct(): void {
+      throw new InvalidOperationException(
+        __CLASS__." objects cannot be directly created",
+      );
+    }
+    <<__Native>>
+    public static function Create(): ChannelArguments;
+
+  }
 
   <<__NativeData("GrpcChannel")>>
   class Channel {
@@ -69,7 +70,7 @@ namespace GrpcNative {
     public static function Create(
       string $name,
       string $target,
-      darray $opt,
+      ChannelArguments $args,
     ): Channel;
 
     <<__Native>>

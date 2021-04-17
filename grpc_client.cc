@@ -57,7 +57,31 @@ std::shared_ptr<ClientContext> ClientContext::New() {
   return std::shared_ptr<ClientContext>(impl);
 }
 
+//
+// ChannelArguments
+//
 
+struct ChannelArgumentsImpl : ChannelArguments {
+  void SetMaxReceiveMessageSize(int size) override { args_->SetMaxReceiveMessageSize(size); }
+  void SetMaxSendMessageSize(int size) override { args_->SetMaxSendMessageSize(size); }
+  void SetLoadBalancingPolicyName(const std::string& lb) override { args_->SetLoadBalancingPolicyName(lb); }
+  
+  static inline ChannelArgumentsImpl* from(ChannelArguments* c) {
+    return static_cast<ChannelArgumentsImpl*>(c);
+  }
+
+  std::unique_ptr<grpc::ChannelArguments> args_;
+};
+
+std::shared_ptr<ChannelArguments> ChannelArguments::New() {
+  auto r = new ChannelArgumentsImpl();
+  r->args_.reset(new grpc::ChannelArguments);
+  return std::shared_ptr<ChannelArguments>(r);
+}
+
+//
+// Channel
+//
 struct ChannelImpl : Channel {
   std::shared_ptr<grpc::Channel> channel_;
   grpc_channel *core_channel_; // not owned
@@ -82,7 +106,7 @@ public:
 
   std::shared_ptr<ChannelImpl> GetChannel(const std::string &name,
                                           const std::string &target,
-                                          const ChannelCreateParams &p) {
+                                          std::shared_ptr<ChannelArguments> args) {
     std::lock_guard<std::mutex> guard(mu_);
     auto it = map_.find(name);
     if (it != map_.end()) {
@@ -92,19 +116,8 @@ public:
     // args);
     // We do a more complicated form of the above so we can get access to the
     // core channel pointer, which in turn can be used with channelz apis.
-    grpc::ChannelArguments args;
-    if (p.max_send_message_size_ > 0) {
-      args.SetMaxSendMessageSize(p.max_send_message_size_);
-    }
-    if (p.max_receive_message_size_ > 0) {
-      args.SetMaxSendMessageSize(p.max_receive_message_size_);
-    }
-    if (!p.lb_policy_name_.empty()) {
-      args.SetLoadBalancingPolicyName(p.lb_policy_name_);
-    }
-
     grpc_channel_args channel_args;
-    args.SetChannelArgs(&channel_args);
+    ChannelArgumentsImpl::from(args.get())->args_->SetChannelArgs(&channel_args);
 
     auto record = std::make_shared<ChannelImpl>();
     record->core_channel_ =
@@ -143,8 +156,8 @@ void GrpcClientInit() {
 
 std::shared_ptr<Channel> GetChannel(const std::string &name,
                                     const std::string &target,
-                                    const ChannelCreateParams &p) {
-  return ChannelStore::Singleton->GetChannel(name, target, p);
+                                    std::shared_ptr<ChannelArguments> args) {
+  return ChannelStore::Singleton->GetChannel(name, target, std::move(args));
 }
 
 /*std::string GrpcClientDebug() {
