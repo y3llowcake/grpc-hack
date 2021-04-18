@@ -26,14 +26,17 @@ struct Status {
 typedef std::vector<std::pair<const uint8_t *, size_t>> SliceList;
 struct Response {
   virtual Status Slices(SliceList *) = 0;
+  virtual ~Response(){};
 };
 
 struct Deserializer {
   virtual void ResponseReady(std::unique_ptr<Response>) = 0;
+  virtual ~Deserializer(){};
 };
 struct Serializer {
   // Invoked when the request content is being serialized to the wire.
   virtual void FillRequest(const void **, size_t *) const = 0;
+  virtual ~Serializer(){};
 };
 
 //
@@ -48,6 +51,7 @@ struct ClientContext {
   virtual void AddMetadata(const std::string &k, const std::string &v) = 0;
   virtual std::string Peer() = 0;
   virtual void TryCancel() = 0;
+  virtual ~ClientContext(){};
 };
 
 //
@@ -57,14 +61,17 @@ struct ClientContext {
 struct UnaryResultEvents : Deserializer {
   // Invoked on completion.
   virtual void Done(const Status &s) = 0;
+  virtual ~UnaryResultEvents(){};
 };
 
 struct StreamReadEvents : Deserializer {
   virtual void Done(const Status &s, bool success) = 0;
+  virtual ~StreamReadEvents(){};
 };
 
 struct StreamReader {
   virtual void Next(StreamReadEvents *d) = 0;
+  virtual ~StreamReader(){};
 };
 
 //
@@ -82,6 +89,7 @@ struct Channel {
                       std::shared_ptr<Serializer> req_,
                       std::shared_ptr<ClientContext> ctx) = 0;
   virtual std::string Debug() = 0;
+  virtual ~Channel(){};
 };
 
 //
@@ -92,6 +100,7 @@ struct ChannelArguments {
   virtual void SetMaxReceiveMessageSize(int size) = 0;
   virtual void SetMaxSendMessageSize(int size) = 0;
   virtual void SetLoadBalancingPolicyName(const std::string &lb) = 0;
+  virtual ~ChannelArguments(){};
 };
 
 std::shared_ptr<Channel> GetChannel(const std::string &name,
