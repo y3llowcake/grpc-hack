@@ -280,6 +280,10 @@ NATIVE_SET_METHOD(GrpcChannelArguments, SetMaxSendMessageSize,
 NATIVE_SET_METHOD(GrpcChannelArguments, SetLoadBalancingPolicyName,
                   d->data_->SetLoadBalancingPolicyName(s.toCppString()),
                   const String &s);
+NATIVE_SET_METHOD(GrpcChannelArguments, SetServiceConfigJSON,
+                  d->data_->SetServiceConfigJSON(s.toCppString()),
+                  const String &s);
+
 Object HHVM_STATIC_METHOD(GrpcChannelArguments, Create) {
   return GrpcChannelArguments::newInstance(std::move(ChannelArguments::New()));
 }
@@ -321,6 +325,8 @@ struct GrpcExtension : Extension {
                 GrpcChannelArguments, SetMaxSendMessageSize);
     HHVM_MALIAS(GrpcNative\\ChannelArguments, SetLoadBalancingPolicyName,
                 GrpcChannelArguments, SetLoadBalancingPolicyName);
+    HHVM_MALIAS(GrpcNative\\ChannelArguments, SetServiceConfigJSON,
+                GrpcChannelArguments, SetServiceConfigJSON);
     Native::registerNativeDataInfo<GrpcChannelArguments>(
         GrpcChannelArguments::s_cppClassName.get());
 

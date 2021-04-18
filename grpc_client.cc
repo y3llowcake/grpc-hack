@@ -79,7 +79,8 @@ std::shared_ptr<ClientContext> ClientContext::New() {
 struct ChannelArgumentsImpl : ChannelArguments {
   void SetMaxReceiveMessageSize(int size) override { args_->SetMaxReceiveMessageSize(size); }
   void SetMaxSendMessageSize(int size) override { args_->SetMaxSendMessageSize(size); }
-  void SetLoadBalancingPolicyName(const std::string& lb) override { args_->SetLoadBalancingPolicyName(lb); }
+  void SetLoadBalancingPolicyName(const std::string& lb) override { args_->SetLoadBalancingPolicyName(lb); }  
+  void SetServiceConfigJSON(const std::string& j) override { args_->SetServiceConfigJSON(j); }
   
   static inline ChannelArgumentsImpl* from(ChannelArguments* c) {
     return static_cast<ChannelArgumentsImpl*>(c);

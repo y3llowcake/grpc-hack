@@ -100,6 +100,7 @@ struct ChannelArguments {
   virtual void SetMaxReceiveMessageSize(int size) = 0;
   virtual void SetMaxSendMessageSize(int size) = 0;
   virtual void SetLoadBalancingPolicyName(const std::string &lb) = 0;
+  virtual void SetServiceConfigJSON(const std::string &name) = 0;
   virtual ~ChannelArguments(){};
 };
 

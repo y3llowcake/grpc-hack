@@ -66,7 +66,8 @@ namespace GrpcNative {
     public function SetMaxMessageSendSize(int $size): void;
     <<__Native>>
     public function SetLoadBalancingPolicyName(string $name): void;
-
+    <<__Native>>
+    public function SetServiceConfigJSON(string $name): void;
   }
 
   <<__NativeData("GrpcChannel")>>
