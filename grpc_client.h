@@ -53,13 +53,13 @@ struct ClientContext {
 // Callbacks.
 //
 
-struct UnaryResultEvents : Serializer, Deserializer {
+struct UnaryResultEvents : Deserializer {
   // Invoked on completion.
-  virtual void Done(Status s) = 0; // TODO parameter should be const ref?
+  virtual void Done(const Status &s) = 0;
 };
 
 struct StreamReadEvents : Deserializer {
-  virtual void Done(Status s, bool success) = 0;
+  virtual void Done(const Status &s, bool success) = 0;
 };
 
 struct StreamReader {
@@ -71,11 +71,14 @@ struct StreamReader {
 //
 
 struct Channel {
+  // todo reorder to ctx up front
   virtual void UnaryCall(const std::string &method,
                          std::shared_ptr<ClientContext> ctx,
+                         std::shared_ptr<Serializer> req_,
                          UnaryResultEvents *) = 0;
   virtual std::unique_ptr<StreamReader>
   ServerStreamingCall(const std::string &method,
+                      std::shared_ptr<Serializer> req_,
                       std::shared_ptr<ClientContext> ctx) = 0;
   virtual std::string Debug() = 0;
 };

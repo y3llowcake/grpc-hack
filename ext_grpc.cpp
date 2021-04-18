@@ -82,7 +82,7 @@ NATIVE_DATA_CLASS(GrpcChannel, GrpcNative\\Channel, std::shared_ptr<Channel>,
 NATIVE_GET_METHOD(String, GrpcChannel, Debug, d->data_->Debug());
 
 //
-// UnaryCall
+// Call Plubming.
 //
 struct GrpcCallResultData : Deserializer {
   // This function *must* be called on a HHVM request thread, not an
@@ -129,20 +129,28 @@ struct GrpcCallResultData : Deserializer {
   std::unique_ptr<Response> gresp_;
 };
 
+struct GrpcSerializer : Serializer {
+  GrpcSerializer(const String &s) : req_(s) {}
+  void FillRequest(const void **c, size_t *l) const override {
+    *c = req_.data();
+    *l = req_.size();
+  }
+
+private:
+  String req_;
+};
+
+//
+// UnaryCall
+//
 struct GrpcEvent final : AsioExternalThreadEvent, UnaryResultEvents {
 public:
   GrpcEvent(const String &req)
       : data_(std::make_unique<GrpcCallResultData>()), req_(req) {}
 
-  void Done(Status s) override {
+  void Done(const Status &s) override {
     data_->status_ = s;
     markAsFinished();
-    req_.reset(); // Drop our reference to the request buffer.
-  }
-
-  void FillRequest(const void **c, size_t *l) const override {
-    *c = req_.data();
-    *l = req_.size();
   }
 
   void ResponseReady(std::unique_ptr<Response> r) override {
@@ -168,7 +176,8 @@ static Object HHVM_METHOD(GrpcChannel, UnaryCall, const Object &ctx,
   auto event = new GrpcEvent(req);
   auto *d = Native::data<GrpcChannel>(this_);
   auto *dctx = Native::data<GrpcClientContext>(ctx);
-  d->data_->UnaryCall(method.toCppString(), dctx->data_, event);
+  auto ser = std::shared_ptr<Serializer>(new GrpcSerializer(req));
+  d->data_->UnaryCall(method.toCppString(), dctx->data_, ser, event);
   return Object{event->getWaitHandle()};
 }
 
@@ -183,25 +192,11 @@ struct GrpcStreamReaderData {
 };
 
 struct GrpcReadStreamEvent final : AsioExternalThreadEvent, StreamReadEvents {
-public:
-  // GrpcReadStreamEvent() : more_(true) {}
-
-  /*  void Done(Status s) override {
-      data_->status_ = s;
-      markAsFinished();
-      req_.reset(); // Drop our reference to the request buffer.
-    }
-
-    void FillRequest(const void **c, size_t *l) const override {
-      *c = req_.data();
-      *l = req_.size();
-    }
-  */
   void ResponseReady(std::unique_ptr<Response> r) override {
     data_->result_->ResponseReady(std::move(r));
   }
 
-  void Done(Status status, bool success) override {
+  void Done(const Status &status, bool success) override {
     success_ = success;
     data_->result_->status_ = status;
     markAsFinished();
@@ -251,11 +246,12 @@ static Object HHVM_METHOD(GrpcStreamReader, Next) {
 
 static Object HHVM_METHOD(GrpcChannel, ServerStreamingCall, const Object &ctx,
                           const String &method, const String &req) {
+  auto ser = std::shared_ptr<Serializer>(new GrpcSerializer(req));
   auto *d = Native::data<GrpcChannel>(this_);
   auto *dctx = Native::data<GrpcClientContext>(ctx);
   auto readerData = std::make_shared<GrpcStreamReaderData>();
   readerData->reader_ = std::move(
-      d->data_->ServerStreamingCall(method.toCppString(), dctx->data_));
+      d->data_->ServerStreamingCall(method.toCppString(), ser, dctx->data_));
   return GrpcStreamReader::newInstance(readerData);
 }
 

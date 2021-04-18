@@ -98,9 +98,13 @@ struct ChannelImpl : Channel {
   void
   UnaryCall(const std::string &method,
       std::shared_ptr<ClientContext> ctx,
-                      UnaryResultEvents *ev) override;
+      std::shared_ptr<Serializer> req,
+      UnaryResultEvents *ev) override;
 
-  std::unique_ptr<StreamReader> ServerStreamingCall(const std::string &method, std::shared_ptr<ClientContext> ctx) override;
+  std::unique_ptr<StreamReader> ServerStreamingCall(
+      const std::string &method,
+      std::shared_ptr<Serializer> req,
+      std::shared_ptr<ClientContext> ctx) override;
 
   grpc_core::Json DebugJson() {
     return grpc_channel_get_channelz_node(core_channel_)->RenderJson();
@@ -110,17 +114,20 @@ struct ChannelImpl : Channel {
 };
 
 void
-ChannelImpl::UnaryCall(const std::string& method,
-  std::shared_ptr<ClientContext> ctx,
-                                 UnaryResultEvents *ev) {
+ChannelImpl::UnaryCall(
+    const std::string& method,
+    std::shared_ptr<ClientContext> ctx,
+    std::shared_ptr<Serializer> req,
+    UnaryResultEvents *ev) {
   // TODO consider using the ClientUnaryReactor API instead, which would give a
   // hook for initial metadata being ready.
   auto meth = grpc::internal::RpcMethod(method.c_str(),
                                         grpc::internal::RpcMethod::NORMAL_RPC);
   ::grpc::internal::CallbackUnaryCall<
-      UnaryResultEvents, UnaryResultEvents,
+      Serializer, UnaryResultEvents,
       Serializer, Deserializer>(
-      channel_.get(), meth, ClientContextImpl::from(ctx.get())->ctx_.get(), ev, ev, [ctx, ev](grpc::Status s) {
+      channel_.get(), meth, ClientContextImpl::from(ctx.get())->ctx_.get(), req.get(), ev, [ctx, req, ev](grpc::Status s) {
+        // req.reset(nullptr);
         ClientContextImpl::from(ctx.get())->capturePeer();
         ev->Done(FromGrpcStatus(s));
       });
@@ -138,6 +145,7 @@ ClientReadReactor() : done_(false) {}
   }
 
   void OnReadInitialMetadataDone(bool ok) override {
+    req_.reset(); // Relase our reference to the request buffer.
     ClientContextImpl::from(ctx_.get())->capturePeer();
   }
 
@@ -163,19 +171,23 @@ ClientReadReactor() : done_(false) {}
   Status status_;
   std::shared_ptr<ClientContext> ctx_;
   StreamReadEvents* ev_;  
+  std::shared_ptr<Serializer> req_;
 };
 
-std::unique_ptr<StreamReader> ChannelImpl::ServerStreamingCall(const std::string& method, std::shared_ptr<ClientContext> ctx) {
+std::unique_ptr<StreamReader> ChannelImpl::ServerStreamingCall(
+    const std::string& method,
+    std::shared_ptr<Serializer> req,
+    std::shared_ptr<ClientContext> ctx) {
   auto meth = grpc::internal::RpcMethod(method.c_str(),
                                         grpc::internal::RpcMethod::SERVER_STREAMING);
-  auto req = new grpc::ByteBuffer(NULL, 0);
   auto reactor = new ClientReadReactor<Deserializer>();
   reactor->ctx_ = ctx;
+  reactor->req_ = req;
   ::grpc::internal::ClientCallbackReaderFactory<Deserializer>::Create(
     channel_.get(),
     meth, 
     ClientContextImpl::from(ctx.get())->ctx_.get(),
-    req, 
+    req.get(),
     reactor
     );
   reactor->AddHold();
