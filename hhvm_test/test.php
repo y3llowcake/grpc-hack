@@ -18,12 +18,20 @@ function main(): void {
   echo "peer: '".$ctx->Peer()."'\n";
   echo $channel->Debug()."\n";
   $ctx = GrpcNative\ClientContext::Create();
-  $channel->ServerStreamingCall(
+  $reader = $channel->ServerStreamingCall(
     $ctx,
     '/helloworld.HelloWorldService/SayHelloStream',
     '',
   );
-  sleep(1);
+  echo "streaming...\n";
+  while (HH\Asio\join($reader->Next())) {
+    $r = $reader->Response();
+    echo "response length: ".strlen($r)."\n";
+    echo "response: '{$r}'\n";
+  }
+  $s = $reader->Status();
+  echo "code: {$s->Code()}\n";
+  echo "message: '{$s->Message()}'\n";
 
   echo "test fin\n";
 }

@@ -15,7 +15,9 @@
 // Status
 //
 
-Status FromGrpcStatus(const grpc::Status s) {
+Status::Status() : code_(grpc::OK) {}
+
+Status FromGrpcStatus(const grpc::Status& s) {
   Status r;
   r.code_ = s.error_code();
   r.message_ = s.error_message();
@@ -98,7 +100,7 @@ struct ChannelImpl : Channel {
       std::shared_ptr<ClientContext> ctx,
                       UnaryResultEvents *ev) override;
 
-  void ServerStreamingCall(const std::string &method, std::shared_ptr<ClientContext> ctx) override;
+  std::unique_ptr<StreamReader> ServerStreamingCall(const std::string &method, std::shared_ptr<ClientContext> ctx) override;
 
   grpc_core::Json DebugJson() {
     return grpc_channel_get_channelz_node(core_channel_)->RenderJson();
@@ -117,7 +119,7 @@ ChannelImpl::UnaryCall(const std::string& method,
                                         grpc::internal::RpcMethod::NORMAL_RPC);
   ::grpc::internal::CallbackUnaryCall<
       UnaryResultEvents, UnaryResultEvents,
-      UnaryResultEvents, UnaryResultEvents>(
+      Serializer, Deserializer>(
       channel_.get(), meth, ClientContextImpl::from(ctx.get())->ctx_.get(), ev, ev, [ctx, ev](grpc::Status s) {
         ClientContextImpl::from(ctx.get())->capturePeer();
         ev->Done(FromGrpcStatus(s));
@@ -125,55 +127,60 @@ ChannelImpl::UnaryCall(const std::string& method,
 }
 
 template <class T>
-class ClientReadReactor : public ::grpc::experimental::ClientReadReactor<T> {
+class ClientReadReactor : public ::grpc::experimental::ClientReadReactor<T>, public StreamReader {
   public:
+ClientReadReactor() : done_(false) {}
   void OnDone(const ::grpc::Status& s) override {
-    printf("wutang done!!!!!!!!!!!!!!\n");
+    done_ = true;
+    status_ = FromGrpcStatus(s);
     ClientContextImpl::from(ctx_.get())->capturePeer();
+    ev_->Done(status_, false);
   }
+
   void OnReadInitialMetadataDone(bool ok) override {
-    printf("wutang initial md!\n");
     ClientContextImpl::from(ctx_.get())->capturePeer();
   }
+
   virtual void OnReadDone(bool ok) override {
     if (ok) {
-      std::cout << "wutang on read done " << ok << std::endl;
-      this->StartRead(new T());
+      this->AddHold(); // Stops OnDone from being invoked until RemoveHold()
+      ev_->Done(status_, true);
+      ev_ = nullptr;
     }
   }
+  
+  virtual void Next(StreamReadEvents *ev) override {
+    if (done_) {
+      // Only expected if someone invokes Next() after it returns false;
+      ev->Done(status_, false);
+    }
+    ev_ = ev;
+    this->StartRead(ev);
+    this->RemoveHold();
+  }
+
+  bool done_;
+  Status status_;
   std::shared_ptr<ClientContext> ctx_;
+  StreamReadEvents* ev_;  
 };
 
-void ChannelImpl::ServerStreamingCall(const std::string& method, std::shared_ptr<ClientContext> ctx) {
+std::unique_ptr<StreamReader> ChannelImpl::ServerStreamingCall(const std::string& method, std::shared_ptr<ClientContext> ctx) {
   auto meth = grpc::internal::RpcMethod(method.c_str(),
                                         grpc::internal::RpcMethod::SERVER_STREAMING);
   auto req = new grpc::ByteBuffer(NULL, 0);
-  auto resp = new grpc::ByteBuffer();
-  printf("wutang\n");
-  auto reactor = new ClientReadReactor<grpc::ByteBuffer>();
+  auto reactor = new ClientReadReactor<Deserializer>();
   reactor->ctx_ = ctx;
-  ::grpc::internal::ClientCallbackReaderFactory<grpc::ByteBuffer>::Create(
+  ::grpc::internal::ClientCallbackReaderFactory<Deserializer>::Create(
     channel_.get(),
     meth, 
     ClientContextImpl::from(ctx.get())->ctx_.get(),
     req, 
     reactor
     );
-
- //reactor->AddHold();
- // https://github.com/grpc/grpc/blob/dae5624e47f3e7ad38d71d71a8667a6c630fa9be/include/grpcpp/impl/codegen/client_callback.h#L283
- reactor->StartRead(resp);
- printf("startingcall\n");
- reactor->StartCall();
-  printf("forever\n");
-
-  
-
-  //reactor ClientReadReactor<groc::ByteBuffer>;
-  // ClientCallbackReaderFactory<grpc::ByteBuffer>::Create(channel_.get(), meth, &ctx->ctx_, &req, reactor);
-  // ClientCallbackReader
-  // ClientCallbackReaderImpl 
-  // ClientCallbackReaderFactory
+  reactor->AddHold();
+  reactor->StartCall();
+  return std::unique_ptr<StreamReader>(reactor);
 }
 
 
@@ -246,16 +253,9 @@ struct ResponseImpl : Response {
 };
 
 // https://grpc.github.io/grpc/cpp/classgrpc_1_1_serialization_traits.html
-template <> class grpc::SerializationTraits<UnaryResultEvents, void> {
+template <> class grpc::SerializationTraits<Serializer, void> {
 public:
-  static grpc::Status Deserialize(ByteBuffer *byte_buffer,
-                                  UnaryResultEvents *dest) {
-    auto r = new ResponseImpl();
-    r->bb_.Swap(byte_buffer);
-    dest->ResponseReady(std::move(std::unique_ptr<Response>(r)));
-    return Status::OK;
-  }
-  static grpc::Status Serialize(const UnaryResultEvents &source,
+  static grpc::Status Serialize(const Serializer &source,
                                 ByteBuffer *buffer, bool *own_buffer) {
     const void *c;
     size_t l;
@@ -264,6 +264,18 @@ public:
     grpc::Slice slice(c, l, grpc::Slice::STATIC_SLICE);
     ByteBuffer tmp(&slice, 1);
     buffer->Swap(&tmp);
+    return Status::OK;
+  }
+};
+
+// https://grpc.github.io/grpc/cpp/classgrpc_1_1_serialization_traits.html
+template <> class grpc::SerializationTraits<Deserializer, void> {
+public:
+  static grpc::Status Deserialize(ByteBuffer *byte_buffer,
+                                  Deserializer *dest) {
+    auto r = new ResponseImpl();
+    r->bb_.Swap(byte_buffer);
+    dest->ResponseReady(std::move(std::unique_ptr<Response>(r)));
     return Status::OK;
   }
 };

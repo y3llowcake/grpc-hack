@@ -11,6 +11,8 @@
 //
 
 struct Status {
+  Status();
+  // todo constructor
   int code_;
   std::string message_;
   std::string details_;
@@ -55,15 +57,15 @@ struct UnaryResultEvents : Serializer, Deserializer {
   // Invoked on completion.
   virtual void Done(Status s) = 0; // TODO parameter should be const ref?
 };
-/*
-struct StreamResultEvents : Deserializer {
-  virtual void Done(Status s) = 0;
-}
+
+struct StreamReadEvents : Deserializer {
+  virtual void Done(Status s, bool success) = 0;
+};
 
 struct StreamReader {
-  virtual void Read(StreamResultEvents *e);
-}
-*/
+  virtual void Next(StreamReadEvents *d) = 0;
+};
+
 //
 // Channels
 //
@@ -72,8 +74,9 @@ struct Channel {
   virtual void UnaryCall(const std::string &method,
                          std::shared_ptr<ClientContext> ctx,
                          UnaryResultEvents *) = 0;
-  virtual void ServerStreamingCall(const std::string &method,
-                                   std::shared_ptr<ClientContext> ctx) = 0;
+  virtual std::unique_ptr<StreamReader>
+  ServerStreamingCall(const std::string &method,
+                      std::shared_ptr<ClientContext> ctx) = 0;
   virtual std::string Debug() = 0;
 };
 

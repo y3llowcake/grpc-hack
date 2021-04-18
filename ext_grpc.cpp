@@ -149,6 +149,7 @@ public:
     data_->ResponseReady(std::move(r));
   }
 
+private:
   std::unique_ptr<GrpcCallResultData> data_;
   String req_;
 
@@ -175,20 +176,87 @@ static Object HHVM_METHOD(GrpcChannel, UnaryCall, const Object &ctx,
 // Streaming Call
 //
 
+struct GrpcStreamReaderData {
+  String resp_;
+  std::unique_ptr<StreamReader> reader_;
+  std::unique_ptr<GrpcCallResultData> result_;
+};
+
+struct GrpcReadStreamEvent final : AsioExternalThreadEvent, StreamReadEvents {
+public:
+  // GrpcReadStreamEvent() : more_(true) {}
+
+  /*  void Done(Status s) override {
+      data_->status_ = s;
+      markAsFinished();
+      req_.reset(); // Drop our reference to the request buffer.
+    }
+
+    void FillRequest(const void **c, size_t *l) const override {
+      *c = req_.data();
+      *l = req_.size();
+    }
+  */
+  void ResponseReady(std::unique_ptr<Response> r) override {
+    data_->result_->ResponseReady(std::move(r));
+  }
+
+  void Done(Status status, bool success) override {
+    success_ = success;
+    data_->result_->status_ = status;
+    markAsFinished();
+  }
+
+  std::shared_ptr<GrpcStreamReaderData> data_;
+  bool success_;
+
+protected:
+  // Invoked by the ASIO Framework after we have markAsFinished(); this is
+  // where we return data to PHP.
+  void unserialize(TypedValue &result) override final {
+    if (success_) {
+      data_->resp_ = data_->result_->UnserializeResponse();
+      if (!data_->result_->status_.Ok()) {
+        // Deserializastion failed.
+        success_ = false;
+      }
+    }
+    tvCopy(make_tv<KindOfBoolean>(success_), result);
+  }
+};
+
 NATIVE_DATA_CLASS(GrpcStreamReader, GrpcNative\\StreamReader,
-                  std::unique_ptr<GrpcCallResultData>, std::move(data));
+                  std::shared_ptr<GrpcStreamReaderData>, std::move(data));
 NATIVE_GET_METHOD(Object, GrpcStreamReader, Status,
-                  GrpcStatus::newInstance(d->data_->status_));
-// NATIVE_GET_METHOD(String, GrpcStreamReader, Response, d->data_->resp_);
+                  d->data_->result_->UnserializeStatus());
+NATIVE_GET_METHOD(String, GrpcStreamReader, Response, d->data_->resp_);
+
+static Object HHVM_METHOD(GrpcStreamReader, Next) {
+  auto *d = Native::data<GrpcStreamReader>(this_);
+  auto nextResult = new GrpcCallResultData();
+  d->data_->result_.reset(nextResult);
+
+  auto event = new GrpcReadStreamEvent();
+  event->data_ = d->data_; // If the stream reader goes out of scope, don't
+                           // destroy the data until the event is finished.
+
+  // TODO cy you need to probably implement trycancel here and for unary...
+  // what if deadline is forever and server never returns and all this stuff
+  // goes out of scope? Hm, probably implement it on the client context
+  // destructor.
+
+  d->data_->reader_->Next(event);
+  return Object{event->getWaitHandle()};
+}
 
 static Object HHVM_METHOD(GrpcChannel, ServerStreamingCall, const Object &ctx,
                           const String &method, const String &req) {
   auto *d = Native::data<GrpcChannel>(this_);
   auto *dctx = Native::data<GrpcClientContext>(ctx);
-  auto ret =
-      GrpcStreamReader::newInstance(std::make_unique<GrpcCallResultData>());
-  d->data_->ServerStreamingCall(method.toCppString(), dctx->data_);
-  return ret;
+  auto readerData = std::make_shared<GrpcStreamReaderData>();
+  readerData->reader_ = std::move(
+      d->data_->ServerStreamingCall(method.toCppString(), dctx->data_));
+  return GrpcStreamReader::newInstance(readerData);
 }
 
 //
@@ -246,6 +314,13 @@ struct GrpcExtension : Extension {
                 GrpcChannelArguments, SetLoadBalancingPolicyName);
     Native::registerNativeDataInfo<GrpcChannelArguments>(
         GrpcChannelArguments::s_cppClassName.get());
+
+    // StreamReader
+    HHVM_MALIAS(GrpcNative\\StreamReader, Next, GrpcStreamReader, Next);
+    HHVM_MALIAS(GrpcNative\\StreamReader, Response, GrpcStreamReader, Response);
+    HHVM_MALIAS(GrpcNative\\StreamReader, Status, GrpcStreamReader, Status);
+    Native::registerNativeDataInfo<GrpcStreamReader>(
+        GrpcStreamReader::s_cppClassName.get());
 
     // Channel
     HHVM_STATIC_MALIAS(GrpcNative\\Channel, Create, GrpcChannel, Create);

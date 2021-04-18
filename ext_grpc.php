@@ -54,7 +54,7 @@ namespace GrpcNative {
       );
     }
     <<__Native>>
-    public function Read(): Awaitable<bool>;
+    public function Next(): Awaitable<bool>;
     <<__Native>>
     public function Status(): Status;
     <<__Native>>
