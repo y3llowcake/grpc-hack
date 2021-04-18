@@ -60,6 +60,9 @@ struct ClientContextImpl: ClientContext {
     return static_cast<ClientContextImpl*>(c);
   }
 
+  // Cancel calls when this object goes out of scope.
+  ~ClientContextImpl() { ctx_->TryCancel(); }
+
   std::unique_ptr<grpc::ClientContext> ctx_;
   std::string peer_;
 };
