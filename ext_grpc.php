@@ -30,21 +30,10 @@ namespace GrpcNative {
     <<__Native>>
     public function SetTimeoutMicros(int $to): void;
     <<__Native>>
-    public function AddMetadata(string $k, string $v): void;
+    public function AddMetadata(dict<string, vec<string>> $md): void;
+    <<__Native>>
+    public function TryCancel(): void;
   }
-
-  /*  <<__NativeData("GrpcUnaryCallResult")>>
-    final class UnaryCallResult {
-      private function __construct(): void {
-        throw new InvalidOperationException(
-          __CLASS__." objects cannot be directly created",
-        );
-      }
-      <<__Native>>
-      public function Status(): Status;
-      <<__Native>>
-      public function Response(): string;
-  	}*/
 
   <<__NativeData("GrpcStreamReader")>>
   final class StreamReader {

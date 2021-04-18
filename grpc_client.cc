@@ -30,7 +30,6 @@ bool Status::Ok() const { return code_ == grpc::OK; }
 //
 // Context
 //
-
 struct ClientContextImpl: ClientContext {
   std::string Peer() override {
     return peer_;
@@ -53,9 +52,14 @@ struct ClientContextImpl: ClientContext {
     peer_ = ctx_->peer();
   }
 
+  void TryCancel() override {
+    ctx_->TryCancel();
+  }
+
   static inline ClientContextImpl* from(ClientContext* c) {
     return static_cast<ClientContextImpl*>(c);
   }
+
   std::unique_ptr<grpc::ClientContext> ctx_;
   std::string peer_;
 };
@@ -69,7 +73,6 @@ std::shared_ptr<ClientContext> ClientContext::New() {
 //
 // ChannelArguments
 //
-
 struct ChannelArgumentsImpl : ChannelArguments {
   void SetMaxReceiveMessageSize(int size) override { args_->SetMaxReceiveMessageSize(size); }
   void SetMaxSendMessageSize(int size) override { args_->SetMaxSendMessageSize(size); }

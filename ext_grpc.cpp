@@ -58,7 +58,9 @@ NATIVE_GET_METHOD(int, GrpcStatus, Code, d->data_.code_);
 NATIVE_GET_METHOD(String, GrpcStatus, Message, d->data_.message_);
 NATIVE_GET_METHOD(String, GrpcStatus, Details, d->data_.details_);
 
+//
 // ClientContext
+//
 NATIVE_DATA_CLASS(GrpcClientContext, GrpcNative\\ClientContext,
                   std::shared_ptr<ClientContext>, std::move(data));
 Object HHVM_STATIC_METHOD(GrpcClientContext, Create) {
@@ -67,12 +69,19 @@ Object HHVM_STATIC_METHOD(GrpcClientContext, Create) {
 NATIVE_GET_METHOD(String, GrpcClientContext, Peer, d->data_->Peer());
 NATIVE_SET_METHOD(GrpcClientContext, SetTimeoutMicros,
                   d->data_->SetTimeoutMicros(p), int p);
-
-// TODO maybe pass the whole dict in here to avoid crossing the boudnary so
-// much?
-NATIVE_SET_METHOD(GrpcClientContext, AddMetadata,
-                  d->data_->AddMetadata(k.toCppString(), v.toCppString()),
-                  const String &k, const String &v);
+static void HHVM_METHOD(GrpcClientContext, TryCancel) {
+  auto *d = Native::data<GrpcClientContext>(this_);
+  d->data_->TryCancel();
+}
+static void HHVM_METHOD(GrpcClientContext, AddMetadata, const Array &md) {
+  auto *d = Native::data<GrpcClientContext>(this_);
+  for (auto it = md.begin(); !it.end(); it.next()) {
+    auto k = it.first().toString().toCppString();
+    for (auto vit = it.second().toArray().begin(); !vit.end(); vit.next()) {
+      d->data_->AddMetadata(k, vit.second().toString().toCppString());
+    }
+  }
+}
 
 //
 // Channel
@@ -118,7 +127,9 @@ struct GrpcCallResultData : Deserializer {
     return String(buf);
   }
 
-  // TODO: Copy discalimer above
+  // This function *must* be called on a HHVM request thread, not an
+  // ASIO/callback thread. It should be called before any call to
+  // UnserializeStatus.
   Object UnserializeStatus() { return GrpcStatus::newInstance(status_); }
 
   void ResponseReady(std::unique_ptr<Response> r) override {
@@ -129,6 +140,9 @@ struct GrpcCallResultData : Deserializer {
   std::unique_ptr<Response> gresp_;
 };
 
+// GrpcSerializer holds a reference to the request buffer (HHVM String) and
+// provides it to grpc. It should remain alive until initial metadata is
+// received or the grpc call is done.
 struct GrpcSerializer : Serializer {
   GrpcSerializer(const String &s) : req_(s) {}
   void FillRequest(const void **c, size_t *l) const override {
@@ -184,7 +198,6 @@ static Object HHVM_METHOD(GrpcChannel, UnaryCall, const Object &ctx,
 //
 // Streaming Call
 //
-
 struct GrpcStreamReaderData {
   String resp_;
   std::unique_ptr<StreamReader> reader_;

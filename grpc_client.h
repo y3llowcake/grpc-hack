@@ -47,6 +47,7 @@ struct ClientContext {
   virtual void SetTimeoutMicros(int to) = 0;
   virtual void AddMetadata(const std::string &k, const std::string &v) = 0;
   virtual std::string Peer() = 0;
+  virtual void TryCancel() = 0;
 };
 
 //
