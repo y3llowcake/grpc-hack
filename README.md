@@ -5,6 +5,9 @@ gRPC extension for HHVM
 - bazel[isk]
 - hhvm source
 
+# Build
+`./build.sh`
+
 # Usage
 TODO
 
