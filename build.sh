@@ -1,7 +1,7 @@
 #!/bin/bash
 set -xeuo pipefail
 
-HHVM_SOURCE_ROOT=/home/cy/co/hhvm
+HHVM_SOURCE_ROOT=/home/cy/sl/hhvm
 
 # hacky version of hphpize
 cp ${HHVM_SOURCE_ROOT}/hphp/tools/hphpize/hphpize.cmake CMakeLists.txt
