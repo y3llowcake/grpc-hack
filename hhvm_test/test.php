@@ -3,6 +3,7 @@
 <<__EntryPoint>>
 function main(): void {
   echo "test start\n";
+  echo "version ".GrpcNative\Version()."\n";
   $cargs = GrpcNative\ChannelArguments::Create();
   echo "new\n";
   $channel = GrpcNative\Channel::Create('foo', 'localhost:50051', $cargs);

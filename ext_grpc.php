@@ -103,4 +103,7 @@ namespace GrpcNative {
     <<__Native>>
     function Debug(): string;
   }
+
+  <<__Native>>
+  function Version(): string;
 }

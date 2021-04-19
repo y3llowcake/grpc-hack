@@ -112,6 +112,8 @@ std::shared_ptr<Channel> GetChannel(const std::string &name,
 // Housekeeping.
 //
 
-void GrpcClientInit();
+void Init();
+
+std::string Version();
 
 #endif // GRPC_CLIENT_H__

@@ -299,8 +299,12 @@ public:
   }
 };
 
-void GrpcClientInit() {
+void Init() {
   grpc_init();
   //gpr_set_log_verbosity(GPR_LOG_SEVERITY_DEBUG);
   ChannelStore::Singleton = new ChannelStore();
+}
+
+std::string Version() {
+  return grpc::Version();
 }

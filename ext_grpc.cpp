@@ -294,8 +294,13 @@ Object HHVM_STATIC_METHOD(GrpcChannel, Create, const String &name,
       GetChannel(name.toCppString(), target.toCppString(), dca->data_)));
 }
 
+//
+// Housekeeping
+//
+String HHVM_FUNCTION(Version) { return Version(); }
+
 struct GrpcExtension : Extension {
-  GrpcExtension() : Extension("grpc", "0.0.1") { GrpcClientInit(); }
+  GrpcExtension() : Extension("grpc", "0.0.1") { Init(); }
 
   void moduleInit() override {
     // Status
@@ -345,6 +350,9 @@ struct GrpcExtension : Extension {
     HHVM_MALIAS(GrpcNative\\Channel, Debug, GrpcChannel, Debug);
     Native::registerNativeDataInfo<GrpcChannel>(
         GrpcChannel::s_cppClassName.get());
+
+    // Housekeeping.
+    HHVM_FALIAS(GrpcNative\\Version, Version);
 
     loadSystemlib();
   }
