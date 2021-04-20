@@ -271,34 +271,6 @@ struct ResponseImpl : Response {
   grpc::ByteBuffer bb_;
 };
 
-// https://grpc.github.io/grpc/cpp/classgrpc_1_1_serialization_traits.html
-template <> class grpc::SerializationTraits<Serializer, void> {
-public:
-  static grpc::Status Serialize(const Serializer &source,
-                                ByteBuffer *buffer, bool *own_buffer) {
-    const void *c;
-    size_t l;
-    source.FillRequest(&c, &l);
-    *own_buffer = true;
-    grpc::Slice slice(c, l, grpc::Slice::STATIC_SLICE);
-    ByteBuffer tmp(&slice, 1);
-    buffer->Swap(&tmp);
-    return Status::OK;
-  }
-};
-
-// https://grpc.github.io/grpc/cpp/classgrpc_1_1_serialization_traits.html
-template <> class grpc::SerializationTraits<Deserializer, void> {
-public:
-  static grpc::Status Deserialize(ByteBuffer *byte_buffer,
-                                  Deserializer *dest) {
-    auto r = new ResponseImpl();
-    r->bb_.Swap(byte_buffer);
-    dest->ResponseReady(std::move(std::unique_ptr<Response>(r)));
-    return Status::OK;
-  }
-};
-
 void Init() {
   grpc_init();
   //gpr_set_log_verbosity(GPR_LOG_SEVERITY_DEBUG);
@@ -307,4 +279,35 @@ void Init() {
 
 std::string Version() {
   return grpc::Version();
+}
+
+// https://stackoverflow.com/questions/25594644/warning-specialization-of-template-in-different-namespace
+namespace grpc {
+  // https://grpc.github.io/grpc/cpp/classgrpc_1_1_serialization_traits.html
+  template <> class SerializationTraits<::Serializer, void> {
+  public:
+    static grpc::Status Serialize(const ::Serializer &source,
+                                  ByteBuffer *buffer, bool *own_buffer) {
+      const void *c;
+      size_t l;
+      source.FillRequest(&c, &l);
+      *own_buffer = true;
+      Slice slice(c, l, grpc::Slice::STATIC_SLICE);
+      ByteBuffer tmp(&slice, 1);
+      buffer->Swap(&tmp);
+      return Status::OK;
+    }
+  };
+
+  // https://grpc.github.io/grpc/cpp/classgrpc_1_1_serialization_traits.html
+  template <> class SerializationTraits<::Deserializer, void> {
+  public:
+    static grpc::Status Deserialize(ByteBuffer *byte_buffer,
+                                    ::Deserializer *dest) {
+      auto r = new ResponseImpl();
+      r->bb_.Swap(byte_buffer);
+      dest->ResponseReady(std::move(std::unique_ptr<Response>(r)));
+      return Status::OK;
+    }
+  };
 }
