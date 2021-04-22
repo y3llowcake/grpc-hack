@@ -101,7 +101,7 @@ namespace GrpcNative {
     ): StreamReader;
 
     <<__Native>>
-    function Debug(): string;
+    public function Debug(): string;
   }
 
   <<__Native>>
