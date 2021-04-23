@@ -119,7 +119,7 @@ struct GrpcCallResultData : Deserializer {
     auto buf = StringData::Make(total);
     auto pos = buf->mutableData();
     for (auto s : slices) {
-      std::copy_n(s.first, s.second, pos);
+      memcpy(pos, s.first, s.second);
       pos += s.second;
     }
     buf->setSize(total);
