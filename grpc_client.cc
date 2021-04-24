@@ -70,6 +70,10 @@ struct ClientContextImpl: ClientContext {
 std::shared_ptr<ClientContext> ClientContext::New() {
   auto impl = new ClientContextImpl;
   impl->ctx_.reset(new grpc::ClientContext());
+  // All our usage of the API suggests we would never be intrested in
+  // pre-emptively sending metadata (and waiting for a response) in advance of
+  // the first message.
+  impl->ctx_->set_initial_metadata_corked(true);
   return std::shared_ptr<ClientContext>(impl);
 }
 
