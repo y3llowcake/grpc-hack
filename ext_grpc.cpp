@@ -300,7 +300,7 @@ Object HHVM_STATIC_METHOD(GrpcChannel, Create, const String &name,
 String HHVM_FUNCTION(Version) { return Version(); }
 
 struct GrpcExtension : Extension {
-  GrpcExtension() : Extension("grpc", "0.0.1") { Init(); }
+  GrpcExtension() : Extension("grpc", "0.0.2") { Init(); }
 
   void moduleInit() override {
     // Status
