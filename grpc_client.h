@@ -101,6 +101,8 @@ struct ChannelArguments {
   virtual void SetMaxSendMessageSize(int size) = 0;
   virtual void SetLoadBalancingPolicyName(const std::string &lb) = 0;
   virtual void SetServiceConfigJSON(const std::string &name) = 0;
+  virtual std::string DebugNormalized() = 0;
+
   virtual ~ChannelArguments(){};
 };
 
@@ -115,5 +117,7 @@ std::shared_ptr<Channel> GetChannel(const std::string &name,
 void Init();
 
 std::string Version();
+
+std::string DebugAllChannels();
 
 #endif // GRPC_CLIENT_H__

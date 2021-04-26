@@ -1,5 +1,4 @@
-#include <grpc++/grpc++.h>
-
+#include <grpc++/grpc++.h> 
 #include <grpcpp/impl/codegen/byte_buffer.h>
 #include <grpcpp/impl/codegen/client_callback.h>
 
@@ -90,6 +89,15 @@ struct ChannelArgumentsImpl : ChannelArguments {
     return static_cast<ChannelArgumentsImpl*>(c);
   }
 
+  std::string DebugNormalized() override {
+    grpc_channel_args args;
+    args_->SetChannelArgs(&args);
+    auto normal = grpc_channel_args_normalize(&args);
+    auto ret = grpc_channel_args_string(normal);
+    grpc_channel_args_destroy(normal);
+    return ret;
+  }
+
   std::unique_ptr<grpc::ChannelArguments> args_;
 };
 
@@ -106,6 +114,10 @@ struct ChannelImpl : Channel {
   std::shared_ptr<grpc::Channel> channel_;
   grpc_channel *core_channel_; // not owned
 
+  std::shared_ptr<ChannelArguments> args_;
+  std::string name_;
+  std::string target_;
+
   void
   UnaryCall(const std::string &method,
       std::shared_ptr<ClientContext> ctx,
@@ -118,7 +130,15 @@ struct ChannelImpl : Channel {
       std::shared_ptr<ClientContext> ctx) override;
 
   grpc_core::Json DebugJson() {
-    return grpc_channel_get_channelz_node(core_channel_)->RenderJson();
+    grpc_core::Json::Object ret;
+    ret["name"] = name_;
+    ret["target"] = target_;
+    ret["normalized_args"] = args_->DebugNormalized();
+    ret["channelz"] = grpc_channel_get_channelz_node(core_channel_)->RenderJson();
+    ret["state"] = grpc_core::ConnectivityStateName(channel_->GetState(false /* try to connect */));
+    ret["lb_policy_name"] = channel_->GetLoadBalancingPolicyName();
+    ret["service_config_json"] = channel_->GetServiceConfigJSON();
+    return ret;
   }
 
   std::string Debug() override { return DebugJson().Dump(2); }
@@ -231,6 +251,9 @@ public:
     ChannelArgumentsImpl::from(args.get())->args_->SetChannelArgs(&channel_args);
 
     auto record = std::make_shared<ChannelImpl>();
+    record->args_ = args;
+    record->name_ = name;
+    record->target_ = target;
     record->core_channel_ =
         grpc_insecure_channel_create(target.c_str(), &channel_args, nullptr);
     std::vector<
@@ -240,6 +263,15 @@ public:
         "", record->core_channel_, std::move(interceptor_creators));
     map_[name] = record;
     return record;
+  }
+
+  std::string Debug() {
+    grpc_core::Json::Object ret;
+    std::lock_guard<std::mutex> guard(mu_);
+    for (auto it = map_.begin(); it != map_.end(); it++) {
+      ret[it->first] = it->second->DebugJson();
+    }
+    return grpc_core::Json(ret).Dump(2);
   }
 
 private:
@@ -266,7 +298,7 @@ struct ResponseImpl : Response {
     if (!status.ok()) {
       return FromGrpcStatus(status);
     }
-    for (int i=0; i<slices.size(); i++ ) {
+    for (size_t i=0; i<slices.size(); i++ ) {
       list->push_back(
           std::make_pair<const uint8_t *, size_t>(slices[i].begin(), slices[i].size()));
     }
@@ -274,6 +306,10 @@ struct ResponseImpl : Response {
   }
   grpc::ByteBuffer bb_;
 };
+
+//
+// Housekeeping.
+//
 
 void Init() {
   grpc_init();
@@ -283,6 +319,10 @@ void Init() {
 
 std::string Version() {
   return grpc::Version();
+}
+
+std::string DebugAllChannels() {
+  return ChannelStore::Singleton->Debug();
 }
 
 // https://stackoverflow.com/questions/25594644/warning-specialization-of-template-in-different-namespace

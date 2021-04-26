@@ -68,6 +68,8 @@ namespace GrpcNative {
     public function SetLoadBalancingPolicyName(string $name): void;
     <<__Native>>
     public function SetServiceConfigJSON(string $name): void;
+    <<__Native>>
+    public function DebugNormalized(): string;
   }
 
   <<__NativeData("GrpcChannel")>>
@@ -106,4 +108,7 @@ namespace GrpcNative {
 
   <<__Native>>
   function Version(): string;
+
+  <<__Native>>
+  function DebugAllChannels(): string;
 }

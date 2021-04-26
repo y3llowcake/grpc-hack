@@ -283,6 +283,8 @@ NATIVE_SET_METHOD(GrpcChannelArguments, SetLoadBalancingPolicyName,
 NATIVE_SET_METHOD(GrpcChannelArguments, SetServiceConfigJSON,
                   d->data_->SetServiceConfigJSON(s.toCppString()),
                   const String &s);
+NATIVE_GET_METHOD(String, GrpcChannelArguments, DebugNormalized,
+                  d->data_->DebugNormalized());
 
 Object HHVM_STATIC_METHOD(GrpcChannelArguments, Create) {
   return GrpcChannelArguments::newInstance(std::move(ChannelArguments::New()));
@@ -298,6 +300,7 @@ Object HHVM_STATIC_METHOD(GrpcChannel, Create, const String &name,
 // Housekeeping
 //
 String HHVM_FUNCTION(Version) { return Version(); }
+String HHVM_FUNCTION(DebugAllChannels) { return DebugAllChannels(); }
 
 struct GrpcExtension : Extension {
   GrpcExtension() : Extension("grpc", "0.0.2") { Init(); }
@@ -332,6 +335,8 @@ struct GrpcExtension : Extension {
                 GrpcChannelArguments, SetLoadBalancingPolicyName);
     HHVM_MALIAS(GrpcNative\\ChannelArguments, SetServiceConfigJSON,
                 GrpcChannelArguments, SetServiceConfigJSON);
+    HHVM_MALIAS(GrpcNative\\ChannelArguments, DebugNormalized,
+                GrpcChannelArguments, DebugNormalized);
     Native::registerNativeDataInfo<GrpcChannelArguments>(
         GrpcChannelArguments::s_cppClassName.get());
 
@@ -353,6 +358,7 @@ struct GrpcExtension : Extension {
 
     // Housekeeping.
     HHVM_FALIAS(GrpcNative\\Version, Version);
+    HHVM_FALIAS(GrpcNative\\DebugAllChannels, DebugAllChannels);
 
     loadSystemlib();
   }
