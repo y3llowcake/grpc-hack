@@ -303,7 +303,7 @@ String HHVM_FUNCTION(Version) { return Version(); }
 String HHVM_FUNCTION(DebugAllChannels) { return DebugAllChannels(); }
 
 struct GrpcExtension : Extension {
-  GrpcExtension() : Extension("grpc", "0.0.2") { Init(); }
+  GrpcExtension() : Extension("grpc", "0.0.3") { Init(); }
 
   void moduleInit() override {
     // Status
