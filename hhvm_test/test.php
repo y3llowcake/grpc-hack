@@ -5,7 +5,10 @@ function main(): void {
   echo "test start\n";
   echo "version ".GrpcNative\Version()."\n";
   $cargs = GrpcNative\ChannelArguments::Create();
+  $cargs->SetMaxSendMessageSize(100000000);
+  echo $cargs->DebugNormalized()."\n";
   $channel = GrpcNative\Channel::Create('foo', 'localhost:60000', $cargs);
+  echo GrpcNative\DebugAllChannels()."\n";
   while (true) {
     $ctx = GrpcNative\ClientContext::Create();
     list($r, $s) = HH\Asio\join(
