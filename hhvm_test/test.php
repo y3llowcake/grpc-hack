@@ -5,18 +5,33 @@ function main(): void {
   echo "test start\n";
   echo "version ".GrpcNative\Version()."\n";
   $cargs = GrpcNative\ChannelArguments::Create();
-  echo "new\n";
-  $channel = GrpcNative\Channel::Create('foo', 'localhost:50051', $cargs);
-  $ctx = GrpcNative\ClientContext::Create();
-  list($r, $s) = HH\Asio\join(
-    $channel->UnaryCall($ctx, '/helloworld.HelloWorldService/SayHello', ''),
-  );
-  //$r = HH\Asio\join(grpc_unary_call('hello world'));
-  echo "code: {$s->Code()}\n";
-  echo "message: '{$s->Message()}'\n";
-  echo "response length: ".strlen($r)."\n";
-  echo "response: '{$r}'\n";
-  echo "peer: '".$ctx->Peer()."'\n";
+  $channel = GrpcNative\Channel::Create('foo', 'localhost:60000', $cargs);
+  while (true) {
+    $ctx = GrpcNative\ClientContext::Create();
+    list($r, $s) = HH\Asio\join(
+      $channel->UnaryCall(
+        $ctx,
+        '/helloworld.HelloWorldService/SayHello',
+        'bonjour!',
+      ),
+    );
+    //$r = HH\Asio\join(grpc_unary_call('hello world'));
+    echo "code: {$s->Code()}\n";
+    echo "message: '{$s->Message()}'\n";
+    echo "response length: ".strlen($r)."\n";
+    echo "response: '{$r}'\n";
+    for ($i = 0; $i < strlen($r); $i++) {
+      if ($r[$i] != '!') {
+        if ($i != 0 && $i + 1 != strlen($r)) {
+          throw new \Exception("poop stick");
+        }
+      }
+    }
+    echo "peer: '".$ctx->Peer()."'\n";
+    if ($ctx->Peer() != "ipv4:127.0.0.1:60000") {
+      throw new \Exception('shit');
+    }
+  }
   echo $channel->Debug()."\n";
   $ctx = GrpcNative\ClientContext::Create();
   $reader = $channel->ServerStreamingCall(

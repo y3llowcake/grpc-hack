@@ -266,9 +266,9 @@ struct ResponseImpl : Response {
     if (!status.ok()) {
       return FromGrpcStatus(status);
     }
-    for (auto s : slices) {
+    for (int i=0; i<slices.size(); i++ ) {
       list->push_back(
-          std::make_pair<const uint8_t *, size_t>(s.begin(), s.size()));
+          std::make_pair<const uint8_t *, size_t>(slices[i].begin(), slices[i].size()));
     }
     return FromGrpcStatus(grpc::Status::OK);
   }
